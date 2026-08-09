@@ -9,6 +9,7 @@ spreadsheet and photos via the Drive/Sheets connector first.
 import base64
 import json
 import re
+import shutil
 import subprocess
 import zipfile
 from datetime import datetime, timedelta
@@ -106,13 +107,22 @@ def fix_numeric_id(s):
 
 
 # ---------------------------------------------------------------------------
-# Photo processing — requires macOS `sips` (or swap for ImageMagick elsewhere)
+# Photo processing — macOS `sips` locally, ImageMagick/Pillow elsewhere (e.g.
+# a Linux cloud sandbox where `sips` doesn't exist)
 # ---------------------------------------------------------------------------
 
 def process_photo(raw_path, out_jpg_path, max_dim=640, quality=60):
     """Convert/resize a downloaded photo (HEIC/JPEG/PNG/...) to a small JPEG
     and return its base64 string. Raises on failure — the caller should
     decide whether a single bad photo should abort the whole build."""
+    if shutil.which('sips'):
+        return _process_photo_sips(raw_path, out_jpg_path, max_dim, quality)
+    if shutil.which('magick') or shutil.which('convert'):
+        return _process_photo_imagemagick(raw_path, out_jpg_path, max_dim, quality)
+    return _process_photo_pillow(raw_path, out_jpg_path, max_dim, quality)
+
+
+def _process_photo_sips(raw_path, out_jpg_path, max_dim, quality):
     r = subprocess.run(
         ['sips', '-s', 'format', 'jpeg', '-Z', str(max_dim), raw_path, '--out', out_jpg_path],
         capture_output=True, text=True,
@@ -120,6 +130,30 @@ def process_photo(raw_path, out_jpg_path, max_dim=640, quality=60):
     if r.returncode != 0:
         raise RuntimeError(f'sips failed on {raw_path}: {r.stderr[:300]}')
     subprocess.run(['sips', '-s', 'formatOptions', str(quality), out_jpg_path], capture_output=True, text=True)
+    with open(out_jpg_path, 'rb') as f:
+        return base64.b64encode(f.read()).decode('ascii')
+
+
+def _process_photo_imagemagick(raw_path, out_jpg_path, max_dim, quality):
+    exe = 'magick' if shutil.which('magick') else 'convert'
+    cmd = [exe, raw_path, '-auto-orient', '-resize', f'{max_dim}x{max_dim}>', '-quality', str(quality), out_jpg_path]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f'{exe} failed on {raw_path}: {r.stderr[:300]}')
+    with open(out_jpg_path, 'rb') as f:
+        return base64.b64encode(f.read()).decode('ascii')
+
+
+def _process_photo_pillow(raw_path, out_jpg_path, max_dim, quality):
+    try:
+        from PIL import Image
+    except ImportError as e:
+        raise RuntimeError(
+            f'no photo-processing tool available (no sips, no ImageMagick, no Pillow) for {raw_path}'
+        ) from e
+    img = Image.open(raw_path).convert('RGB')
+    img.thumbnail((max_dim, max_dim))
+    img.save(out_jpg_path, 'JPEG', quality=quality)
     with open(out_jpg_path, 'rb') as f:
         return base64.b64encode(f.read()).decode('ascii')
 

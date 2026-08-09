@@ -1,0 +1,7 @@
+# Build artifacts from local/cloud test runs — regenerated each build, not source
+photos_fts/
+photos_xts/
+responses_fts.*
+responses_xts.*
+*_dashboard_output.html
+scripts/weekly_update/log/

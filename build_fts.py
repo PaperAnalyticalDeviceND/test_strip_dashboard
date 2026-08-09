@@ -189,6 +189,7 @@ def build_dashboard_data(records):
 def build_photos_by_lot(records, photos_dir):
     photos_by_lot = {}
     missing = []
+    attempted = failed = 0
     for r in records:
         k = lotkey(r['brand'], r['lot'])
         for u in r['photos']:
@@ -201,9 +202,11 @@ def build_photos_by_lot(records, photos_dir):
                 continue
             raw_path = os.path.join(photos_dir, raw_candidates[0])
             out_jpg = os.path.join(photos_dir, f'{fid}.__out.jpg')
+            attempted += 1
             try:
                 b64 = process_photo(raw_path, out_jpg)
             except Exception as e:
+                failed += 1
                 print(f'WARN: photo {fid} failed to process: {e}', file=sys.stderr)
                 continue
             finally:
@@ -214,6 +217,12 @@ def build_photos_by_lot(records, photos_dir):
             })
     if missing:
         print(f'WARN: {len(missing)} photo(s) referenced in the sheet were not found in {photos_dir}: {missing}', file=sys.stderr)
+    if attempted > 0 and failed == attempted:
+        raise RuntimeError(
+            f'all {attempted} photo(s) on disk failed to process (0 succeeded) - '
+            'this looks like a missing/broken image tool, not per-photo corruption; '
+            'aborting rather than publishing a dashboard with zero photos'
+        )
     return photos_by_lot
 
 

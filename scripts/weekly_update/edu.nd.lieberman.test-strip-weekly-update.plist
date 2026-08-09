@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>edu.nd.lieberman.test-strip-weekly-update</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/mlieberm/cPAD/test_strip_dashboard/scripts/weekly_update/run_weekly_update.sh</string>
+    </array>
+
+    <!-- Fridays at 8:00 PM in whatever timezone the Mac's system clock uses
+         (America/Indianapolis) — launchd uses local time directly, so this
+         follows DST automatically with no manual adjustment twice a year. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>5</integer>
+        <key>Hour</key>
+        <integer>20</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/mlieberm/cPAD/test_strip_dashboard/scripts/weekly_update/log/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/mlieberm/cPAD/test_strip_dashboard/scripts/weekly_update/log/launchd.err.log</string>
+</dict>
+</plist>
