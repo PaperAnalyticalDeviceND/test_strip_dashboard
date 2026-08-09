@@ -6,9 +6,12 @@ name: weekly-update
 # service account (JSON key stored as the GDRIVE_SA_JSON secret) that has
 # read access to the responses sheet + photos folder.
 #
-# Output flow: build_fts.py / build_xts.py write HTML files, which this
-# workflow then pushes to the `gh-pages` branch. GitHub Pages serves that
-# branch at https://padproject.info/test_strip_dashboard/ .
+# Output flow: build_fts.py / build_xts.py write HTML files, then
+# build_hub.py rebuilds index.html from templates/hub_template.html,
+# pulling live lot/submission/detection-rate stats out of the two just-built
+# dashboards so the hub's numbers never drift out of sync. This workflow
+# then pushes all three files to the `gh-pages` branch. GitHub Pages serves
+# that branch at https://padproject.info/test_strip_dashboard/ .
 
 on:
   # Fridays at 20:00 America/Indianapolis. Cron uses UTC and does not do
@@ -86,6 +89,10 @@ jobs:
         run: |
           python3 build_xts.py responses_xts.xlsx photos_xts _build/xts.html
 
+      - name: Build hub (live stats pulled from the two dashboards above)
+        run: |
+          python3 build_hub.py _build/fts.html _build/xts.html templates/hub_template.html _build/index.html
+
       - name: Wipe secret file before publish
         if: always()
         run: rm -f .secrets/gdrive_sa.json
@@ -103,6 +110,7 @@ jobs:
           cd /tmp/gh-pages-worktree
           git add fts.html || true
           git add xts.html || true
+          git add index.html || true
           if git diff --cached --quiet; then
             echo "no changes to publish"
           else
