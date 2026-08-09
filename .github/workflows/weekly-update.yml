@@ -110,5 +110,5 @@ jobs:
             echo "no changes to publish"
           else
             git commit -m "weekly-update: rebuild $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
+            git push origin gh-pages
           fi
