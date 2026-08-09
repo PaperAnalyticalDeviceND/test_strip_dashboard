@@ -6,26 +6,26 @@ name: weekly-update
 # service account (JSON key stored as the GDRIVE_SA_JSON secret) that has
 # read access to the responses sheet + photos folder.
 #
-# See docs/PROPOSAL-GITHUB-PAGES.md for setup instructions and the design
-# rationale for pivoting from a Claude Artifact publish to GitHub Pages.
+# Output flow: build_fts.py / build_xts.py write HTML files, which this
+# workflow then pushes to the `gh-pages` branch. GitHub Pages serves that
+# branch at https://padproject.info/test_strip_dashboard/ .
 
 on:
-  # Fridays at 20:00 America/Indianapolis. Indianapolis is UTC-5 (EST) in
-  # winter and UTC-4 (EDT) in summer; cron uses UTC and does not do DST,
-  # so we run two crons that cover both offsets (only one will produce
-  # meaningful new data per week; the second will republish the same
-  # content). If DST is annoying, pick one and accept a 1-hour drift.
+  # Fridays at 20:00 America/Indianapolis. Cron uses UTC and does not do
+  # DST, so we run two crons that cover both offsets (only one will
+  # produce meaningful new data per week; the second will republish the
+  # same content).
   schedule:
     - cron: '0 1 * * 6'   # Saturday 01:00 UTC = Friday 20:00 EST (winter)
     - cron: '0 0 * * 6'   # Saturday 00:00 UTC = Friday 20:00 EDT (summer)
-  workflow_dispatch:       # manual "Run workflow" button, no schedule wait
+  workflow_dispatch:       # manual "Run workflow" button, for testing
 
 concurrency:
   group: weekly-update
   cancel-in-progress: false
 
 permissions:
-  contents: write          # for git commit + push of the rebuilt docs/
+  contents: write          # for git push of the rebuilt dashboards
 
 jobs:
   rebuild:
@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout
+      - name: Checkout main (build tools + templates)
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -70,11 +70,12 @@ jobs:
 
       - name: Build FTS dashboard
         run: |
-          python3 build_fts.py responses_fts.xlsx photos_fts docs/fts.html
+          mkdir -p _build
+          python3 build_fts.py responses_fts.xlsx photos_fts _build/fts.html
 
       # XTS block — mirrored from FTS. Sheet ID for XTS lives in
-      # scripts/weekly_update/prompt_xts_cloud.md; substitute here when
-      # promoting from proposal to production.
+      # scripts/weekly_update/prompt_xts_cloud.md; paste it (and the
+      # correct photo column index) here to enable XTS updates.
       #
       # - name: Fetch XTS response sheet + photos from Google Drive
       #   run: |
@@ -86,20 +87,26 @@ jobs:
       #       --sa-json .secrets/gdrive_sa.json
       # - name: Build XTS dashboard
       #   run: |
-      #     python3 build_xts.py responses_xts.xlsx photos_xts docs/xts.html
+      #     python3 build_xts.py responses_xts.xlsx photos_xts _build/xts.html
 
-      - name: Wipe secret file before commit
+      - name: Wipe secret file before publish
         if: always()
         run: rm -f .secrets/gdrive_sa.json
 
-      - name: Commit rebuilt dashboards to docs/ if changed
+      - name: Publish built dashboards to gh-pages
         run: |
+          set -euo pipefail
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add docs/
+          # Clone gh-pages branch into a temp dir and copy built files in
+          git worktree add /tmp/gh-pages-worktree gh-pages
+          cp _build/*.html /tmp/gh-pages-worktree/
+          cd /tmp/gh-pages-worktree
+          git add fts.html || true
+          # git add xts.html || true   # uncomment when XTS is wired
           if git diff --cached --quiet; then
             echo "no changes to publish"
-            exit 0
+          else
+            git commit -m "weekly-update: rebuild $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
           fi
-          git commit -m "weekly-update: rebuild dashboards ($(date -u +%Y-%m-%dT%H:%MZ))"
-          git push
