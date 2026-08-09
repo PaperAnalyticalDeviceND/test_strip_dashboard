@@ -1,0 +1,105 @@
+name: weekly-update
+
+# Weekly rebuild of the FTS + XTS lot-testing dashboards. Runs on GitHub's
+# infrastructure — no dependency on Marya's Mac being awake, no Claude
+# routine plumbing, no MCP connectors. Everything auths via a Google Cloud
+# service account (JSON key stored as the GDRIVE_SA_JSON secret) that has
+# read access to the responses sheet + photos folder.
+#
+# See docs/PROPOSAL-GITHUB-PAGES.md for setup instructions and the design
+# rationale for pivoting from a Claude Artifact publish to GitHub Pages.
+
+on:
+  # Fridays at 20:00 America/Indianapolis. Indianapolis is UTC-5 (EST) in
+  # winter and UTC-4 (EDT) in summer; cron uses UTC and does not do DST,
+  # so we run two crons that cover both offsets (only one will produce
+  # meaningful new data per week; the second will republish the same
+  # content). If DST is annoying, pick one and accept a 1-hour drift.
+  schedule:
+    - cron: '0 1 * * 6'   # Saturday 01:00 UTC = Friday 20:00 EST (winter)
+    - cron: '0 0 * * 6'   # Saturday 00:00 UTC = Friday 20:00 EDT (summer)
+  workflow_dispatch:       # manual "Run workflow" button, no schedule wait
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write          # for git commit + push of the rebuilt docs/
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/gha/requirements.txt
+
+      - name: Install ImageMagick (fallback photo processor for common.py)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Write service-account JSON from secret
+        run: |
+          mkdir -p .secrets
+          printf '%s' "${GDRIVE_SA_JSON}" > .secrets/gdrive_sa.json
+          chmod 600 .secrets/gdrive_sa.json
+        env:
+          GDRIVE_SA_JSON: ${{ secrets.GDRIVE_SA_JSON }}
+
+      - name: Fetch FTS response sheet + photos from Google Drive
+        run: |
+          python3 scripts/gha/fetch_drive.py \
+            --sheet-id '1Rlj5yWXoaa18aLsdI3L0Hri6RAq6MRvl6Rmxjycuo2Y' \
+            --photo-column 12 \
+            --out-xlsx responses_fts.xlsx \
+            --out-photos-dir photos_fts \
+            --sa-json .secrets/gdrive_sa.json
+
+      - name: Build FTS dashboard
+        run: |
+          python3 build_fts.py responses_fts.xlsx photos_fts docs/fts.html
+
+      # XTS block — mirrored from FTS. Sheet ID for XTS lives in
+      # scripts/weekly_update/prompt_xts_cloud.md; substitute here when
+      # promoting from proposal to production.
+      #
+      # - name: Fetch XTS response sheet + photos from Google Drive
+      #   run: |
+      #     python3 scripts/gha/fetch_drive.py \
+      #       --sheet-id '<XTS_SHEET_ID_HERE>' \
+      #       --photo-column '<XTS_PHOTO_COLUMN_INDEX>' \
+      #       --out-xlsx responses_xts.xlsx \
+      #       --out-photos-dir photos_xts \
+      #       --sa-json .secrets/gdrive_sa.json
+      # - name: Build XTS dashboard
+      #   run: |
+      #     python3 build_xts.py responses_xts.xlsx photos_xts docs/xts.html
+
+      - name: Wipe secret file before commit
+        if: always()
+        run: rm -f .secrets/gdrive_sa.json
+
+      - name: Commit rebuilt dashboards to docs/ if changed
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add docs/
+          if git diff --cached --quiet; then
+            echo "no changes to publish"
+            exit 0
+          fi
+          git commit -m "weekly-update: rebuild dashboards ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push
