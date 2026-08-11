@@ -143,6 +143,7 @@
   .chip-row{display:flex; flex-wrap:wrap; gap:6px; min-height:24px;}
   .chip{ font-family:var(--font-mono); font-size:11px; padding:3px 8px; border-radius:20px; background:var(--warn-tint); color:var(--warn); border:1px solid transparent; }
   .chip.clean{background:var(--good-tint); color:var(--good);}
+  .chip.untested{background:var(--surface-2); color:var(--ink-3);}
 
   .lot-card-foot{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink-3); padding-top:10px; border-top:1px solid var(--border); }
 
@@ -282,6 +283,7 @@
       <option value="recent">Sort: most recent</option>
       <option value="most_tested">Sort: most submissions</option>
       <option value="az">Sort: brand A&ndash;Z</option>
+      <option value="interference_asc">Sort: fewest interferences flagged</option>
     </select>
     <label class="toggle-chip" id="flagToggleWrap">
       <input type="checkbox" id="flagToggle">
@@ -400,6 +402,7 @@ function sortLots(list, mode){
   else if (mode === 'recent') arr.sort((a,b)=> (b.last_submitted||'').localeCompare(a.last_submitted||''));
   else if (mode === 'most_tested') arr.sort((a,b)=> b.n_submissions - a.n_submissions);
   else if (mode === 'az') arr.sort((a,b)=> a.brand.localeCompare(b.brand));
+  else if (mode === 'interference_asc') arr.sort((a,b)=> (a.interferents.length - b.interferents.length) || a.brand.localeCompare(b.brand));
   return arr;
 }
 
@@ -414,9 +417,12 @@ function metricBlock(label, rate, n_pos, n_run, statusFn){
 }
 
 function lotCardHTML(l){
+  const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
   const chips = l.interferents.length
     ? l.interferents.map(i => `<span class="chip">${i.label} @ ${i.min_mg_ml} mg/mL${i.min_intensity!==null?' (int. '+i.min_intensity+')':''}</span>`).join('')
-    : `<span class="chip clean">No interferent detected</span>`;
+    : totalInterferenceRuns > 0
+      ? `<span class="chip clean">No interferent detected</span>`
+      : `<span class="chip untested">Not tested yet</span>`;
   const galleryKey = l.brand + '||' + l.lot;
   const keyAttr = esc(galleryKey);
   const lotPhotos = PHOTOS_BY_LOT[galleryKey] || [];
@@ -486,9 +492,12 @@ function openDrawer(key){
   const l = lots.find(x => (x.brand+'||'+x.lot) === key);
   if (!l) return;
   const subs = submissions.filter(s => (s.brand+'||'+s.lot) === key);
+  const drawerTotalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
   const interferentsHTML = l.interferents.length
     ? `<div class="interferent-list">${l.interferents.map(i=>`<div class="irow"><span>${i.label}</span><span>false-positive-risk at ≥ ${i.min_mg_ml} mg/mL &middot; intensity as low as ${i.min_intensity ?? '—'} &middot; ${i.hits}/${i.run} replicates</span></div>`).join('')}</div>`
-    : `<div class="chip clean">No cross-reactive interferent detected across ${Object.values(l.matrix).reduce((a,m)=>a+m.run,0)} interference replicates</div>`;
+    : drawerTotalInterferenceRuns > 0
+      ? `<div class="chip clean">No cross-reactive interferent detected across ${drawerTotalInterferenceRuns} interference replicates</div>`
+      : `<div class="chip untested">Not tested yet &mdash; no interference replicates recorded for this lot</div>`;
   const keyAttr = esc(key);
   const subRows = subs.map(s => `
     <tr>
@@ -624,7 +633,11 @@ function renderMatrix(){
       ${info.desc ? `<div class="sub-desc">${info.desc}</div>` : ''}
     </th>`;
   }).join('');
-  const rows = lots.map(l => {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const mode = document.getElementById('sortSelect').value;
+  let matrixLots = lots.filter(l => !q || lotSearchText(l).includes(q));
+  matrixLots = sortLots(matrixLots, mode);
+  const rows = matrixLots.map(l => {
     const cells = SUBSTANCES.map(s => {
       const m = l.matrix[s.code];
       if (!m.run) return `<td class="cell"><div class="swatch" style="background:var(--heat-0); color:var(--ink-3)">n/a</div></td>`;
@@ -647,6 +660,7 @@ function renderMatrix(){
     <span><span class="lg-swatch" style="background:var(--heat-2)"></span>flagged at 0.7 mg/mL</span>
     <span><span class="lg-swatch" style="background:var(--heat-3)"></span>flagged at 0.2 mg/mL (most sensitive)</span>
     <span style="margin-left:auto">cell reads flagged / replicates run &middot; &ldquo;flagged&rdquo; = read Positive or intensity ≤ 3</span>`;
+  document.getElementById('resultCount').textContent = matrixLots.length + ' of ' + lots.length + ' lots × ' + SUBSTANCES.length + ' substances';
 }
 
 /* ---------- log view ---------- */
@@ -694,7 +708,7 @@ function renderLog(){
 let currentView = 'lots';
 function renderCurrentView(){
   if (currentView === 'lots') renderLots();
-  else if (currentView === 'matrix') { renderMatrix(); document.getElementById('resultCount').textContent = lots.length + ' lots × ' + SUBSTANCES.length + ' substances'; }
+  else if (currentView === 'matrix') renderMatrix();
   else if (currentView === 'log') renderLog();
 }
 document.getElementById('viewSwitch').addEventListener('click', e => {
@@ -704,7 +718,7 @@ document.getElementById('viewSwitch').addEventListener('click', e => {
   document.querySelectorAll('#viewSwitch button').forEach(b=>b.classList.toggle('active', b===btn));
   document.querySelectorAll('section.view').forEach(s=>s.classList.remove('active'));
   document.getElementById('view-'+currentView).classList.add('active');
-  document.getElementById('sortSelect').style.display = currentView==='lots' ? '' : 'none';
+  document.getElementById('sortSelect').style.display = currentView==='log' ? 'none' : '';
   renderCurrentView();
 });
 document.getElementById('searchInput').addEventListener('input', renderCurrentView);
