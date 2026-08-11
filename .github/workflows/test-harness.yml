@@ -1,0 +1,120 @@
+name: test-harness
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Python graph deps (pyyaml/rdflib/pyshacl) go through a venv on every job.
+# pyshacl is not packaged in apt and old ubuntu's pip rejects PEP 668's
+# --break-system-packages, so a venv is the one mechanism that works on the
+# hosted ubuntu/macOS runners and the bare container images alike. The venv
+# lives under RUNNER_TEMP, never the workspace (the smoke tests copy the
+# workspace into their sandbox).
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python deps (venv)
+        run: |
+          python3 -m venv "${RUNNER_TEMP:-/tmp}/venv"
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet --upgrade pip
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet pyyaml rdflib pyshacl
+          echo "${RUNNER_TEMP:-/tmp}/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify dependencies
+        run: |
+          bash --version | head -1
+          jq --version
+          git --version
+          python3 --version
+          python3 -c 'import yaml, rdflib, pyshacl; print("py deps ok")'
+
+      - name: Run test harness
+        env:
+          MVP_TEMPLATE_LOCAL: ${{ github.workspace }}
+        run: ./scripts/test/run.sh
+
+  # Exercise run.sh's DEFAULT template-source path: with MVP_TEMPLATE_LOCAL
+  # unset, the harness exports the checkout's git-visible files into the
+  # sandbox via git ls-files + tar --null -T -. The jobs above pin the
+  # variable, so without this job that branch never runs in CI at all —
+  # including bsdtar's --null -T - handling on macOS, which has no other
+  # coverage (dev boxes are Linux/GNU tar). Smoke only: that is the
+  # category that consumes clone_template, where the default matters.
+  default-template-source:
+    name: test (default source / ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python deps (venv)
+        run: |
+          python3 -m venv "${RUNNER_TEMP:-/tmp}/venv"
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet --upgrade pip
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet pyyaml rdflib pyshacl
+          echo "${RUNNER_TEMP:-/tmp}/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run test harness (smoke, default template source)
+        run: ./scripts/test/run.sh --category=smoke
+
+  # Exercise the harness across packaged git versions that straddle two cutoffs:
+  # init.defaultBranch (git 2.28) and GIT_CONFIG_GLOBAL (git 2.32). Containers,
+  # not runners, since GitHub ships one git per hosted image. ubuntu:20.04 ==
+  # git 2.25.1, the version where init-wiki branch detection (F5) regressed in
+  # the field. glibc 2.31 on 20.04 satisfies node20; 18.04 (git 2.17) would not,
+  # so 2.25 is the floor here. macOS / BSD-tool coverage stays in the job above.
+  git-versions:
+    name: test (git ${{ matrix.git }} / ${{ matrix.image }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: "ubuntu:20.04", git: "2.25" }
+          - { image: "ubuntu:22.04", git: "2.34" }
+          - { image: "ubuntu:24.04", git: "2.43" }
+    steps:
+      - name: Install system deps (git before checkout so it gets a .git tree)
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            curl git jq python3 python3-venv ca-certificates
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python deps (venv)
+        run: |
+          python3 -m venv "${RUNNER_TEMP:-/tmp}/venv"
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet --upgrade pip
+          "${RUNNER_TEMP:-/tmp}/venv/bin/pip" install --quiet pyyaml rdflib pyshacl
+          echo "${RUNNER_TEMP:-/tmp}/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify dependencies
+        run: |
+          bash --version | head -1
+          git --version
+          jq --version
+          python3 --version
+          python3 -c 'import yaml, rdflib, pyshacl; print("py deps ok")'
+
+      - name: Run test harness
+        env:
+          MVP_TEMPLATE_LOCAL: ${{ github.workspace }}
+        run: ./scripts/test/run.sh

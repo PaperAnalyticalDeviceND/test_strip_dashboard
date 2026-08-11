@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.1.0",
+  "generated_at": "2026-06-22T00:00:00Z",
+  "generator": "fixture for agent-comms-script-shape unit test",
+  "org": "fixture-org",
+  "agents": [
+    {
+      "id": "fixtureuser/fixture-agent",
+      "owner_repo": "fixture-org/fixture-agent",
+      "description": "Fixture agent for unit-testing ask.sh direct mode resolution.",
+      "topics": ["fixture"],
+      "capabilities": [],
+      "home_url": "file:///dev/null",
+      "card_url": "file:///dev/null",
+      "wiki_clone_url": "https://example.invalid/no-such-repo.wiki.git",
+      "endpoints": {},
+      "private": false
+    },
+    {
+      "id": "fixtureuser/second-fixture-agent",
+      "owner_repo": "fixture-org/second-fixture-agent",
+      "description": "Second fixture agent (for testing ambiguity is NOT triggered by repo-basename match across different basenames).",
+      "topics": ["fixture"],
+      "capabilities": [],
+      "home_url": "file:///dev/null",
+      "card_url": "file:///dev/null",
+      "wiki_clone_url": "https://example.invalid/no-such-second-repo.wiki.git",
+      "endpoints": {},
+      "private": false
+    }
+  ]
+}

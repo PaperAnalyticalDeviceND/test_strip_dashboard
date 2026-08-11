@@ -1,0 +1,23 @@
+{
+  "name": "test-feature",
+  "version": "0.0.1",
+  "description": "Minimal fixture feature used by the feature-flag-infra unit test. Not a real feature; never ships in features/.",
+  "status": "experimental",
+
+  "files":   { "source": "code/",  "destination": "scripts/test-feature/" },
+  "ci":      { "workflow_file": "ci/test-feature.yml" },
+  "rule":    { "source": "rule.md" },
+
+  "system_deps": [
+    {
+      "name": "echo",
+      "version": ">=0.1",
+      "install": {
+        "ubuntu": "(part of coreutils, already installed)",
+        "macos":  "(built-in, already installed)"
+      }
+    }
+  ],
+
+  "depends_on": []
+}
