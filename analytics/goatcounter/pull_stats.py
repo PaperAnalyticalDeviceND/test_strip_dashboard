@@ -14,6 +14,7 @@ convention the dashboard builds already follow.
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
@@ -33,9 +34,16 @@ def api_get(token, path, params=None):
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
+        "User-Agent": "test_strip_dashboard-goatcounter-snapshot/1.0",
     })
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        print(f"HTTPError {e.code} for {url}\nResponse headers: {dict(e.headers)}\nBody: {body[:2000]}",
+              file=sys.stderr)
+        raise
 
 
 def main():
