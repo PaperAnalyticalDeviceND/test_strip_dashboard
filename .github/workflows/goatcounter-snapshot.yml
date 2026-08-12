@@ -1,0 +1,55 @@
+name: goatcounter-snapshot
+
+# Weekly pull of GoatCounter usage stats for the hub/FTS/XTS pages, written
+# to analytics/goatcounter/snapshot.json and committed to main. The file is
+# overwritten each run; git history on it is the historical record, not a
+# hand-maintained running log (same "recompute from source, don't trust a
+# cache" convention the dashboard builds already follow).
+#
+# Requires the GOATCOUNTER_API_TOKEN repo secret (Settings > Secrets and
+# variables > Actions), created from the GoatCounter account's
+# username menu > API.
+
+on:
+  schedule:
+    - cron: '30 1 * * 6'   # ~30 min after the dashboard rebuild's Saturday slot
+  workflow_dispatch:        # manual "Run workflow" button, for testing
+
+concurrency:
+  group: goatcounter-snapshot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Pull GoatCounter stats
+        run: python3 analytics/goatcounter/pull_stats.py
+        env:
+          GOATCOUNTER_API_TOKEN: ${{ secrets.GOATCOUNTER_API_TOKEN }}
+
+      - name: Commit snapshot
+        run: |
+          set -euo pipefail
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add analytics/goatcounter/snapshot.json
+          if git diff --cached --quiet; then
+            echo "no changes to commit"
+          else
+            git commit -m "goatcounter-snapshot: $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push origin main
+          fi
