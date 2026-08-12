@@ -209,6 +209,9 @@
   .reset-hint:hover{ text-decoration:underline; }
   table.matrix th.rowhead{text-align:left; position:sticky; left:0; background:var(--surface); z-index:1;}
   table.matrix td.rowhead{text-align:left; position:sticky; left:0; background:var(--surface); z-index:1;}
+  table.matrix td.rowhead.brandcell{cursor:pointer;}
+  table.matrix td.rowhead.brandcell:hover{background:var(--surface-2);}
+  table.matrix td.rowhead.brandcell:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
   table.matrix .brandcell .brand{font-family:var(--font-display); font-size:13px; font-weight:600;}
   table.matrix .brandcell .lotnum{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3);}
   td.cell{cursor:default; font-family:var(--font-mono); font-size:11.5px; font-variant-numeric:tabular-nums; color:var(--ink-2); position:relative;}
@@ -670,14 +673,21 @@ function renderMatrix(){
       const title = m.hits ? `${s.label}: flagged in ${m.hits} of ${m.run} replicates, lowest at ${m.min_mg} mg/mL (intensity as low as ${m.min_intensity ?? '—'})` : `${s.label}: no flagged reading in ${m.run} replicates`;
       return `<td class="cell" title="${title}"><div class="swatch" style="background:var(--heat-${step}); color:${step>=3?'#fff':'var(--ink)'}">${label}</div></td>`;
     }).join('');
+    const rowKey = esc(l.brand + '||' + l.lot);
     return `<tr>
-      <td class="rowhead brandcell"><div class="brand">${esc(l.brand)}</div><div class="lotnum">${esc(l.lot)}</div></td>
+      <td class="rowhead brandcell" data-key="${rowKey}" tabindex="0" title="View lot detail">
+        <div class="brand">${esc(l.brand)}</div><div class="lotnum">${esc(l.lot)}</div>
+      </td>
       ${cells}
     </tr>`;
   }).join('');
   document.getElementById('matrixTable').innerHTML = `
     <thead><tr><th class="rowhead">Lot${matrixSort.code ? ' <span class="reset-hint" id="matrixResetBtn" title="Reset to the dropdown sort above">reset ↺</span>' : ''}</th>${theadCols}</tr></thead>
     <tbody>${rows}</tbody>`;
+  document.querySelectorAll('#matrixTable tbody td.rowhead[data-key]').forEach(td => {
+    td.addEventListener('click', () => openDrawer(td.dataset.key));
+    td.addEventListener('keydown', e => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); openDrawer(td.dataset.key); } });
+  });
   document.getElementById('matrixLegend').innerHTML = `
     <span><span class="lg-swatch" style="background:var(--heat-0)"></span>not tested</span>
     <span><span class="lg-swatch" style="background:var(--heat-1)"></span>clean, or flagged only ≥ 2.0 mg/mL</span>
