@@ -1,0 +1,28 @@
+version: "3.8"
+
+# Self-hosted GoatCounter for the Lieberman Lab test-strip dashboards.
+# See ./README.md for setup steps.
+#
+# Serves HTTPS directly (GoatCounter's built-in ACME/Let's Encrypt support),
+# so no separate reverse proxy is required. Point the chosen subdomain's
+# DNS A/AAAA record at this host before starting the container, or ACME
+# cert issuance will fail.
+
+services:
+  goatcounter:
+    image: arp242/goatcounter:latest
+    container_name: goatcounter
+    restart: unless-stopped
+    ports:
+      - "80:80"    # required for ACME HTTP-01 challenge
+      - "443:443"
+    volumes:
+      - goatcounter-data:/home/goatcounter/db
+    command: >
+      serve
+      -listen :443
+      -tls tls,rdr,acme
+      -db sqlite3+/home/goatcounter/db/goatcounter.sqlite3
+
+volumes:
+  goatcounter-data:
