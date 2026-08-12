@@ -364,6 +364,8 @@
     .masthead-right{text-align:left;}
   }
 </style>
+<script data-goatcounter="https://liebermandashboards.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -870,6 +872,7 @@ document.getElementById('viewSwitch').addEventListener('click', e => {
   document.querySelectorAll('section.view').forEach(s=>s.classList.remove('active'));
   document.getElementById('view-'+currentView).classList.add('active');
   document.getElementById('sortSelect').style.display = currentView==='log' ? 'none' : '';
+  window.goatcounter?.count?.({path: 'fts-view-'+currentView, title: 'FTS view: '+currentView, event: true});
   renderCurrentView();
 });
 document.getElementById('searchInput').addEventListener('input', renderCurrentView);
