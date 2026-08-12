@@ -246,6 +246,8 @@
   .drawer-sub-table th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-3); padding:6px 8px; border-bottom:1px solid var(--border);}
   .drawer-sub-table td{padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:top;}
   .drawer-sub-table td.mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+  .drawer-sub-table td.post-exp{color:var(--crit); font-weight:600;}
+  .post-exp-tag{display:block; font-family:var(--font-body); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--crit);}
   .drawer-photos{font-size:13px; color:var(--ink-2);}
   .drawer-photos a{margin-right:12px;}
   .drawer-photo-link{
@@ -612,7 +614,7 @@ function openDrawer(key){
   const keyAttr = esc(key);
   const subRows = subs.map(s => `
     <tr>
-      <td class="mono">${s.timestamp.split(' ')[0]}</td>
+      <td class="mono${s.post_exp ? ' post-exp' : ''}"${s.post_exp ? ` title="Tested after this submission's recorded expiration date (${esc(s.expiration)})"` : ''}>${s.timestamp.split(' ')[0]}${s.post_exp ? '<span class="post-exp-tag">post exp</span>' : ''}</td>
       <td>${esc(s.tester)}</td>
       <td class="mono">${s.fen_summary}</td>
       <td class="mono">${s.wat_summary}</td>

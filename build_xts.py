@@ -95,7 +95,8 @@ def parse_records(header, rows):
             interference[sub] = {'HI': r[HI[i]], 'MED': r[MED[i]], 'LO': r[LO[i]]}
         records.append({
             'dt': dt, 'name': r[COL['name']], 'affiliation': r[COL['affiliation']],
-            'brand': r[COL['brand']], 'lot': fix_numeric_id(r[COL['lot']]), 'expiration': r[COL['expiration']],
+            'brand': r[COL['brand']], 'lot': fix_numeric_id(r[COL['lot']]),
+            'expiration_dt': excel_serial_to_dt(r[COL['expiration']]),
             'source': r[COL['source']], 'photos': photos,
             'tp_2500_di': panel_stats(r, TP_2500_DI),
             'tp_2500_tap': panel_stats(r, TP_2500_TAP),
@@ -120,8 +121,8 @@ def build_dashboard_data(records):
         L = lots[k]
         L['brand'] = r['brand'].strip()
         L['lot'] = fix_numeric_id(r['lot'].strip())
-        if r['expiration']:
-            L['expirations'].add(r['expiration'])
+        if r['expiration_dt']:
+            L['expirations'].add(r['expiration_dt'].date())
         L['submissions'].append(r['dt'])
         L['testers'].add(r['name'])
         if r['photos']:
@@ -155,10 +156,13 @@ def build_dashboard_data(records):
                         st['min_intensity'] = res['min_intensity']
                     row_flags.append(f"{sub}@{mg}")
 
+        post_exp = bool(r['expiration_dt'] and r['dt'].date() > r['expiration_dt'].date())
         sub_rows.append({
             'id': idx, 'timestamp': r['dt'].strftime('%-m/%-d/%Y %H:%M:%S'), 'ts_sort': r['dt'].isoformat(),
             'tester': r['name'], 'affiliation': r['affiliation'],
             'brand': r['brand'], 'lot': fix_numeric_id(r['lot']),
+            'expiration': r['expiration_dt'].strftime('%-m/%-d/%Y') if r['expiration_dt'] else None,
+            'post_exp': post_exp,
             'tp_2500_di': r['tp_2500_di'], 'tp_2500_tap': r['tp_2500_tap'], 'tp_1000_di': r['tp_1000_di'],
             'tn_water': tn, 'interferents_flagged': row_flags,
             'n_photos': len(r['photos']), 'first_photo': r['photos'][0] if r['photos'] else None,
@@ -181,7 +185,8 @@ def build_dashboard_data(records):
 
         run_tn = L['tn_run']
         lot_out.append({
-            'brand': L['brand'], 'lot': L['lot'], 'expirations': sorted(L['expirations']),
+            'brand': L['brand'], 'lot': L['lot'],
+            'expirations': [d.strftime('%-m/%-d/%Y') for d in sorted(L['expirations'])],
             'n_submissions': len(L['submissions']), 'testers': sorted(L['testers']),
             'first_submitted': min(dates).strftime('%Y-%m-%d'), 'last_submitted': max(dates).strftime('%Y-%m-%d'),
             'tp_2500_di_run': L['tp']['2500_di'][0], 'tp_2500_di_pos': L['tp']['2500_di'][1], 'tp_2500_di_rate': rate(L['tp']['2500_di']),
