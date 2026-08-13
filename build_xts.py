@@ -5,10 +5,11 @@ Usage:
     python3 build_xts.py <responses.xlsx> <photos_dir> <output.html>
 
 <photos_dir> must contain the raw downloaded bytes of every photo referenced
-in the sheet's product/packaging photo column (column K), named
-<drive_file_id>.<ext>. Missing photos are skipped with a warning, not a hard
-failure.
+in the sheet's product/packaging photo column (column K) and its strip-photo
+column (column BT), named <drive_file_id>.<ext>. Missing photos are skipped
+with a warning, not a hard failure.
 """
+import hashlib
 import os
 import re
 import sys
@@ -18,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
     parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id,
     process_photo, extract_drive_file_id, inject_into_template,
+    reconcile_photo_counts,
 )
 
 SUBSTANCES = ['DIPHEN', 'KETA', 'LIDO', 'PREMETH', 'CETIRI', 'METH', 'MDMA', 'ROMI', 'TIZA', 'CLONI', 'APRACLONI']
@@ -39,7 +41,7 @@ TN_WATER = 37
 # If the form's question order ever changes, re-verify against a fresh header row.
 COL = dict(
     ts=0, name=2, affiliation=3, brand=6, lot=7, expiration=8,
-    source=9, photos=10, notes=72,
+    source=9, photos=10, strip_photos=71, notes=72,
 )
 
 
@@ -89,7 +91,8 @@ def parse_records(header, rows):
         dt = excel_serial_to_dt(r[COL['ts']])
         if not r[COL['brand']].strip() or not r[COL['lot']].strip() or dt is None:
             continue
-        photos = [u.strip() for u in r[COL['photos']].split(',') if u.strip()]
+        photos = [u.strip() for u in r[COL['photos']].split(',') if u.strip()] + \
+            [u.strip() for u in r[COL['strip_photos']].split(',') if u.strip()]
         interference = {}
         for i, sub in enumerate(SUBSTANCES):
             interference[sub] = {'HI': r[HI[i]], 'MED': r[MED[i]], 'LO': r[LO[i]]}
@@ -228,8 +231,9 @@ def build_dashboard_data(records):
 
 def build_photos_by_lot(records, photos_dir):
     photos_by_lot = {}
+    seen_hashes_by_lot = defaultdict(set)
     missing = []
-    attempted = failed = 0
+    attempted = failed = skipped_dupes = 0
     for r in records:
         k = lotkey(r['brand'], r['lot'])
         for u in r['photos']:
@@ -241,6 +245,12 @@ def build_photos_by_lot(records, photos_dir):
                 missing.append(fid)
                 continue
             raw_path = os.path.join(photos_dir, raw_candidates[0])
+            with open(raw_path, 'rb') as fh:
+                content_hash = hashlib.sha256(fh.read()).hexdigest()
+            if content_hash in seen_hashes_by_lot[k]:
+                skipped_dupes += 1
+                continue
+            seen_hashes_by_lot[k].add(content_hash)
             out_jpg = os.path.join(photos_dir, f'{fid}.__out.jpg')
             attempted += 1
             try:
@@ -257,6 +267,8 @@ def build_photos_by_lot(records, photos_dir):
             })
     if missing:
         print(f'WARN: {len(missing)} photo(s) referenced in the sheet were not found in {photos_dir}: {missing}', file=sys.stderr)
+    if skipped_dupes:
+        print(f'INFO: skipped {skipped_dupes} duplicate photo upload(s) (identical content hash within the same lot)', file=sys.stderr)
     if attempted > 0 and failed == attempted:
         raise RuntimeError(
             f'all {attempted} photo(s) on disk failed to process (0 succeeded) - '
@@ -279,6 +291,7 @@ def main():
 
     dashboard_data = build_dashboard_data(records)
     photos_by_lot = build_photos_by_lot(records, photos_dir)
+    reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey)
     print(f'lots: {len(dashboard_data["lots"])}  photos matched to {len(photos_by_lot)} lots')
 
     template_html = open(template_path).read()

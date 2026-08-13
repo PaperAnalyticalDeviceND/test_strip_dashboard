@@ -106,8 +106,9 @@ def download_binary_file(drive, file_id: str, out_dir: Path) -> Path | None:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--sheet-id", required=True, help="Google Sheet file ID (from the URL)")
-    p.add_argument("--photo-column", type=int, required=True,
-                   help="0-indexed column with comma-separated photo Drive URLs / IDs")
+    p.add_argument("--photo-column", type=int, action="append", required=True,
+                   help="0-indexed column with comma-separated photo Drive URLs / IDs; "
+                        "pass multiple times to pull photos from more than one column")
     p.add_argument("--out-xlsx", required=True, help="Path to write the exported .xlsx")
     p.add_argument("--out-photos-dir", required=True, help="Directory to write photos into")
     p.add_argument("--sa-json", required=True, help="Path to the service-account JSON key")
@@ -123,27 +124,29 @@ def main() -> int:
     print(f"exporting sheet {args.sheet_id} → {out_xlsx}")
     download_sheet_as_xlsx(drive, args.sheet_id, out_xlsx)
 
-    print(f"parsing sheet for photo IDs in column {args.photo_column}")
+    print(f"parsing sheet for photo IDs in column(s) {args.photo_column}")
     header, rows = parse_xlsx_sheet(str(out_xlsx))
-    if args.photo_column >= len(header):
-        print(
-            f"ERROR: --photo-column {args.photo_column} exceeds header width "
-            f"{len(header)}; header={header}",
-            file=sys.stderr,
-        )
-        return 2
+    for col in args.photo_column:
+        if col >= len(header):
+            print(
+                f"ERROR: --photo-column {col} exceeds header width "
+                f"{len(header)}; header={header}",
+                file=sys.stderr,
+            )
+            return 2
 
     unique_ids: set[str] = set()
     for row in rows:
-        if args.photo_column >= len(row):
-            continue
-        for raw in row[args.photo_column].split(","):
-            raw = raw.strip()
-            if not raw:
+        for col in args.photo_column:
+            if col >= len(row):
                 continue
-            fid = extract_drive_file_id(raw)
-            if fid:
-                unique_ids.add(fid)
+            for raw in row[col].split(","):
+                raw = raw.strip()
+                if not raw:
+                    continue
+                fid = extract_drive_file_id(raw)
+                if fid:
+                    unique_ids.add(fid)
 
     print(f"found {len(unique_ids)} unique photo IDs; downloading")
     n_ok = 0

@@ -10,8 +10,8 @@ import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import inject_into_template
-from build_xts import parse_records, build_dashboard_data, build_photos_by_lot
+from common import inject_into_template, reconcile_photo_counts
+from build_xts import parse_records, build_dashboard_data, build_photos_by_lot, lotkey
 
 EPOCH = datetime(1899, 12, 30)
 
@@ -48,6 +48,7 @@ def main():
 
     dashboard_data = build_dashboard_data(records)
     photos_by_lot = build_photos_by_lot(records, photos_dir)
+    reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey)
     print(f'lots: {len(dashboard_data["lots"])}  photos matched to {len(photos_by_lot)} lots')
 
     template_html = open(template_path).read()

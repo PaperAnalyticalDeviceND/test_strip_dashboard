@@ -32,7 +32,8 @@ safer (no manual retyping) — prefer it if you have a choice.
 
 Run this repo's `common.py` to parse the sheet and find every Drive photo ID
 referenced in the "Photos of product & packaging" column (column M, 0-indexed
-12) using `parse_xlsx_sheet()`. For each unique file ID found, download the
+12) and the "Photos of the strips" column (column AZ, 0-indexed 51) using
+`parse_xlsx_sheet()`. For each unique file ID found, download the
 raw file with the same connector's download tool (no exportMimeType needed —
 these are ordinary uploaded images/HEIC files, not Google-native documents).
 Save each one to a `photos_fts/` directory as `<file_id>.<ext>`, using

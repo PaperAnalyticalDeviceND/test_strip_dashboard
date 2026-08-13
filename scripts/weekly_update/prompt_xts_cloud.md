@@ -48,7 +48,8 @@ comes back inline:
 ## 2. Find and download the referenced photos
 
 Parse the sheet (however you obtained it above) to find every Drive photo ID
-referenced in the product/packaging photo column (column K, 0-indexed 10).
+referenced in the product/packaging photo column (column K, 0-indexed 10) and
+the strip-photo column (column BT, 0-indexed 71).
 For each unique file ID found, download the raw file with
 `mcp__Google_Drive__download_file_content` (no exportMimeType — these are
 ordinary uploaded images). Save each to a `photos_xts/` directory as

@@ -163,6 +163,18 @@ def extract_drive_file_id(url):
     return m.group(1) if m else None
 
 
+def reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey_fn):
+    """Overwrite each lot's n_photos with the actual number of photos that
+    will appear in its gallery. build_dashboard_data() counts raw photo
+    references from the sheet; build_photos_by_lot() then drops references
+    whose file isn't on disk and collapses duplicate-content uploads. Without
+    this reconciliation the "N photos" badge can promise more than the
+    gallery delivers when it's clicked."""
+    for lot in dashboard_data['lots']:
+        key = lotkey_fn(lot['brand'], lot['lot'])
+        lot['n_photos'] = len(photos_by_lot.get(key, []))
+
+
 # ---------------------------------------------------------------------------
 # Safe embedding into an HTML <script> tag
 # ---------------------------------------------------------------------------

@@ -67,6 +67,7 @@ jobs:
           python3 scripts/gha/fetch_drive.py \
             --sheet-id '1Rlj5yWXoaa18aLsdI3L0Hri6RAq6MRvl6Rmxjycuo2Y' \
             --photo-column 12 \
+            --photo-column 51 \
             --out-xlsx responses_fts.xlsx \
             --out-photos-dir photos_fts \
             --sa-json .secrets/gdrive_sa.json
@@ -81,6 +82,7 @@ jobs:
           python3 scripts/gha/fetch_drive.py \
             --sheet-id '1qYtKDqcohHx9rJ3bx4wJ6injxoIY592twVzGwKtEzg4' \
             --photo-column 10 \
+            --photo-column 71 \
             --out-xlsx responses_xts.xlsx \
             --out-photos-dir photos_xts \
             --sa-json .secrets/gdrive_sa.json
