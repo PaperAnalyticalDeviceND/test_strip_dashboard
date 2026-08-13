@@ -111,7 +111,7 @@ def fix_numeric_id(s):
 # a Linux cloud sandbox where `sips` doesn't exist)
 # ---------------------------------------------------------------------------
 
-def process_photo(raw_path, out_jpg_path, max_dim=640, quality=60):
+def process_photo(raw_path, out_jpg_path, max_dim=480, quality=45):
     """Convert/resize a downloaded photo (HEIC/JPEG/PNG/...) to a small JPEG
     and return its base64 string. Raises on failure — the caller should
     decide whether a single bad photo should abort the whole build."""
