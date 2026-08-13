@@ -625,22 +625,25 @@ function sortLots(list, mode){
   else if (mode === 'most_tested') arr.sort((a,b)=> b.n_submissions - a.n_submissions);
   else if (mode === 'az') arr.sort((a,b)=> a.brand.localeCompare(b.brand));
   else if (mode === 'expiration') {
+    // Three buckets, sorted independently and concatenated, rather than
+    // one combined comparator — easier to verify each bucket's internal
+    // order is right, and sidesteps having to prove global consistency.
+    // Not-yet-expired lots first (soonest-to-expire on top, since that's
+    // what's still gettable now but going away soonest), then lots with
+    // no recorded expiration, then expired lots (most-recently-expired
+    // first, since those are "closest" to still being current).
     const now = new Date();
-    const expDate = l => {
-      if (!l.expirations || !l.expirations.length) return null;
-      const d = parseDateMDY(l.expirations[l.expirations.length-1]);
-      return isNaN(d) ? null : d;
-    };
-    arr.sort((a,b)=>{
-      const da = expDate(a), db = expDate(b);
-      const aFuture = da !== null && da >= now;
-      const bFuture = db !== null && db >= now;
-      if (aFuture !== bFuture) return aFuture ? -1 : 1; // not-yet-expired lots first
-      if (da === null && db === null) return a.brand.localeCompare(b.brand);
-      if (da === null) return 1; // no recorded expiration sorts last within its group
-      if (db === null) return -1;
-      return aFuture ? da - db : db - da; // soonest-to-expire first; most-recently-expired first
+    const future = [], unknown = [], past = [];
+    arr.forEach(l => {
+      const d = latestExpDate(l);
+      if (d === null) unknown.push(l);
+      else if (d >= now) future.push(l);
+      else past.push(l);
     });
+    future.sort((a,b)=> latestExpDate(a) - latestExpDate(b));
+    unknown.sort((a,b)=> a.brand.localeCompare(b.brand));
+    past.sort((a,b)=> latestExpDate(b) - latestExpDate(a));
+    return future.concat(unknown, past);
   }
   else if (mode === 'performance') {
     const eligible = eligibleLotsForFit();
@@ -663,6 +666,12 @@ function performanceTierChip(l){
   if (score.compositePct >= 0.7) return `<div class="chip-row"><span class="chip clean">Better than most</span></div>`;
   if (score.compositePct <= 0.3) return `<div class="chip-row"><span class="chip">Has weaknesses compared to most</span></div>`;
   return `<div class="chip-row"><span class="chip untested">Typical performance</span></div>`;
+}
+function expirationChip(l){
+  const d = latestExpDate(l);
+  if (d === null) return `<div class="chip-row"><span class="chip untested">Exp date not known</span></div>`;
+  const label = d >= new Date() ? `Expires ${l.expirations[l.expirations.length-1]}` : `Expired ${l.expirations[l.expirations.length-1]}`;
+  return `<div class="chip-row"><span class="chip ${d >= new Date() ? 'clean' : ''}">${esc(label)}</span></div>`;
 }
 function lotCardHTML(l, sortMode){
   const fs = fenStatus(l.fen_rate), ws = watStatus(l.wat_rate);
@@ -711,6 +720,7 @@ function lotCardHTML(l, sortMode){
       </div>
       <div class="chip-row">${chips}</div>
       ${sortMode === 'performance' ? performanceTierChip(l) : ''}
+      ${sortMode === 'expiration' ? expirationChip(l) : ''}
       <div class="lot-card-foot">
         <span class="testers">${l.n_submissions} submission${l.n_submissions>1?'s':''} &middot; ${l.testers.length} tester${l.testers.length>1?'s':''}</span>
         <span>last ${l.last_submitted}</span>
@@ -783,11 +793,19 @@ function parseDateMDY(s){
   if (bits.length !== 3 || bits.some(isNaN)) return new Date(NaN);
   return new Date(bits[2], bits[0]-1, bits[1]);
 }
+// The most recent recorded expiration for a lot, as a Date, or null if
+// none is recorded / it doesn't parse. Shared by the expiration sort, the
+// "exp date not known" card flag, and the summary's expiration warning.
+function latestExpDate(l){
+  if (!l.expirations || !l.expirations.length) return null;
+  const d = parseDateMDY(l.expirations[l.expirations.length - 1]);
+  return isNaN(d) ? null : d;
+}
 function expirationClause(l){
   if (!l.expirations || !l.expirations.length) return '';
   const latestStr = l.expirations[l.expirations.length - 1];
-  const d = parseDateMDY(latestStr);
-  if (isNaN(d) || d >= new Date()) return '';
+  const d = latestExpDate(l);
+  if (d === null || d >= new Date()) return '';
   return ` This lot's recorded expiration (${latestStr}) has passed, so it's probably no longer available for purchase.`;
 }
 function lotSummary(l){
