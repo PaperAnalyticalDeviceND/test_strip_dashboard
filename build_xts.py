@@ -74,7 +74,13 @@ def parse_result(cell):
 
 
 def panel_stats(row, cols):
-    run = pos = 0
+    """Returns (run, pos, clean_pos). clean_pos counts positives with no
+    visible test line at all (kind='positive') as distinct from positives
+    read via a faint 1-3 intensity line (kind='intensity') — the latter is
+    a real detection by the lab's scoring convention, but a line a reader
+    could plausibly miss in practice, so it's tracked separately for the
+    "how clear was the read" signal (see lotFitForUse() in the template)."""
+    run = pos = clean_pos = 0
     for c in cols:
         r = parse_result(row[c])
         if r is None or r['kind'] in ('invalid', 'unrecognized'):
@@ -82,7 +88,9 @@ def panel_stats(row, cols):
         run += 1
         if r['reads_positive']:
             pos += 1
-    return run, pos
+            if r['kind'] == 'positive':
+                clean_pos += 1
+    return run, pos, clean_pos
 
 
 def parse_records(header, rows):
@@ -114,7 +122,7 @@ def parse_records(header, rows):
 def build_dashboard_data(records):
     lots = defaultdict(lambda: {
         'brand': '', 'lot': '', 'expirations': set(), 'submissions': [], 'testers': set(), 'photos': [],
-        'tp': {'2500_di': [0, 0], '2500_tap': [0, 0], '1000_di': [0, 0]},
+        'tp': {'2500_di': [0, 0, 0], '2500_tap': [0, 0, 0], '1000_di': [0, 0, 0]},
         'tn_run': 0, 'tn_pos': 0,
         'sub_stats': defaultdict(lambda: {'run': 0, 'hits': 0, 'min_mg': None, 'min_intensity': None}),
     })
@@ -132,9 +140,10 @@ def build_dashboard_data(records):
             L['photos'].extend(r['photos'])
 
         for key, panel in (('2500_di', 'tp_2500_di'), ('2500_tap', 'tp_2500_tap'), ('1000_di', 'tp_1000_di')):
-            run, pos = r[panel]
+            run, pos, clean_pos = r[panel]
             L['tp'][key][0] += run
             L['tp'][key][1] += pos
+            L['tp'][key][2] += clean_pos
 
         tn = r['tn_water']
         if tn and tn['kind'] not in ('invalid', 'unrecognized'):
@@ -183,8 +192,11 @@ def build_dashboard_data(records):
         matrix = {sub: {'run': L['sub_stats'][sub]['run'], 'hits': L['sub_stats'][sub]['hits'], 'min_mg': L['sub_stats'][sub]['min_mg'], 'min_intensity': L['sub_stats'][sub]['min_intensity']} for sub in SUBSTANCES}
 
         def rate(pair):
-            run, pos = pair
+            run, pos = pair[0], pair[1]
             return round(100 * pos / run, 1) if run else None
+
+        clarity_run = sum(L['tp'][k][0] for k in L['tp'])
+        clarity_clean = sum(L['tp'][k][2] for k in L['tp'])
 
         run_tn = L['tn_run']
         lot_out.append({
@@ -195,6 +207,8 @@ def build_dashboard_data(records):
             'tp_2500_di_run': L['tp']['2500_di'][0], 'tp_2500_di_pos': L['tp']['2500_di'][1], 'tp_2500_di_rate': rate(L['tp']['2500_di']),
             'tp_2500_tap_run': L['tp']['2500_tap'][0], 'tp_2500_tap_pos': L['tp']['2500_tap'][1], 'tp_2500_tap_rate': rate(L['tp']['2500_tap']),
             'tp_1000_di_run': L['tp']['1000_di'][0], 'tp_1000_di_pos': L['tp']['1000_di'][1], 'tp_1000_di_rate': rate(L['tp']['1000_di']),
+            'clarity_run': clarity_run, 'clarity_clean': clarity_clean,
+            'clarity_rate': round(100 * clarity_clean / clarity_run, 1) if clarity_run else None,
             'tn_run': run_tn, 'tn_pos': L['tn_pos'],
             'tn_specificity_rate': round(100 * (run_tn - L['tn_pos']) / run_tn, 1) if run_tn else None,
             'interferents': interferents, 'matrix': matrix,
