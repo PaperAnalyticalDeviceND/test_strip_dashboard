@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
     parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id,
     process_photo, extract_drive_file_id, inject_into_template,
-    reconcile_photo_counts,
+    reconcile_photo_counts, DASHBOARD_VERSION,
 )
 
 SUBSTANCES = ['DIPHEN', 'KETA', 'LIDO', 'PREMETH', 'CETIRI', 'METH', 'MDMA', 'ROMI', 'TIZA', 'CLONI', 'APRACLONI']
@@ -240,7 +240,7 @@ def build_dashboard_data(records):
         'date_range': [min(dts).strftime('%b %-d, %Y'), max(dts).strftime('%b %-d, %Y')],
         'substances': [{'code': s, 'label': SUB_LABEL[s]} for s in SUBSTANCES],
     }
-    return {'overall': overall, 'lots': lot_out, 'submissions': sub_rows}
+    return {'dashboard_version': DASHBOARD_VERSION, 'overall': overall, 'lots': lot_out, 'submissions': sub_rows}
 
 
 def build_photos_by_lot(records, photos_dir):

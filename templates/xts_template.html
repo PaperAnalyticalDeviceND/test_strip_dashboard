@@ -332,6 +332,7 @@
 
   <footer>
     <strong>Method.</strong> All figures on this page are based on reports to the password-protected lot checking data collector form. If your lab wants to participate, contact <a href="mailto:mlieberm@nd.edu">Prof.&nbsp;Lieberman</a>. A lot is identified by Brand&nbsp;+&nbsp;Lot&nbsp;number; expiration dates are recorded but not used for matching, since testers occasionally mistype them. Three true-positive panels are tracked separately for 2500&nbsp;ng/mL xylazine in DI water, 2500&nbsp;ng/mL in (hard) tap water, and 1000&nbsp;ng/mL in DI water &mdash; comparing the first two isolates the effect of water hardness; comparing DI at two concentrations shows sensitivity near the low end. True negative results are from testing with DI water (n&nbsp;=&nbsp;58 pooled). <strong>Result reading.</strong> Testers score each test line's visibility on a 1&ndash;10 intensity scale (10&nbsp;=&nbsp;dark and obvious, 1&nbsp;=&nbsp;so faint viewers disagree whether it's there), or record a flat &ldquo;Positive&rdquo; when the control line only was seen. Per the lab's guidance, intensities of 1&ndash;3 are treated as effectively unreadable and counted the same as &ldquo;Positive&rdquo; for both detection and interference purposes, since a real-world reader in imperfect lighting is likely to miss a line that faint. Cells with a range (e.g. &ldquo;5&ndash;10&rdquo;) or a comma-separated list use the lowest value in that cell, the most conservative reading. Thumbnails use the first product/packaging or strip photo uploaded per lot (product/packaging and strip photos are both pulled in and merged into one gallery); a hash of each photo's contents is used to skip duplicate uploads of the same image. Refresh is manual for now. Chemical structure thumbnails on the interference matrix page are skeletal formulas from Wikimedia Commons (public domain; click a structure to open its source Wikipedia article).
+    <br><span id="versionNote"></span>
   </footer>
 </div>
 
@@ -355,6 +356,7 @@
 <script>
 const PHOTOS_BY_LOT = __PHOTOS_DATA__;
 const DATA = __DASHBOARD_DATA__;
+document.getElementById("versionNote").textContent = "Dashboard v" + DATA.dashboard_version;
 
 const SUBSTANCES = DATA.overall.substances;
 const lots = DATA.lots;

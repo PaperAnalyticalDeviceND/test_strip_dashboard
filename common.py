@@ -17,6 +17,14 @@ from xml.etree import ElementTree as ET
 
 NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 
+# Shown in each page's footer. Bump by hand: increment the part before the
+# dot for a major change (new view, new data model, a redesign), the part
+# after for a minor one (new filter/sort, copy edits, a bugfix). One shared
+# version for both FTS and XTS -- they're the same "lot checking dashboard"
+# project, built from this same module, and versioned separately from the
+# unrelated drug_trash_dashboard project's own counter.
+DASHBOARD_VERSION = '1.1'
+
 
 # ---------------------------------------------------------------------------
 # xlsx parsing (stdlib only — no openpyxl/pandas dependency)

@@ -435,6 +435,7 @@
 
   <footer>
     <strong>Method.</strong> All figures on this page are based on reports to the password-protected lot checking data collector form. If your lab wants to participate, contact <a href="mailto:mlieberm@nd.edu">Prof.&nbsp;Lieberman</a>. A lot is identified by Brand&nbsp;+&nbsp;Lot&nbsp;number; expiration dates are recorded but not used for matching, since testers occasionally mistype them. &ldquo;Fentanyl detection rate&rdquo; pools every individual strip run at 200&nbsp;ng/mL across all submissions for that lot; &ldquo;true negative&rdquo; pools every strip run in plain water. Interferents are flagged when any replicate at any tested concentration (2.0, 0.7, or 0.2&nbsp;mg/mL) read positive. Some recently-logged lots show &ldquo;&mdash;&rdquo; because no replicates have been run yet. Thumbnails and gallery photos use each submission's product/packaging upload (column M) and strip-photo upload (column AZ), merged into one gallery per lot; a hash of each photo's contents is used to skip duplicate uploads of the same image. This is a static prototype, so photos are a fixed snapshot and refresh is manual for now. Chemical structure thumbnails on the interference matrix page are skeletal formulas from Wikimedia Commons (public domain; click a structure to open its source Wikipedia article).
+    <br><span id="versionNote"></span>
   </footer>
 </div>
 
@@ -458,6 +459,7 @@
 <script>
 const PHOTOS_BY_LOT = __PHOTOS_DATA__;
 const DATA = __DASHBOARD_DATA__;
+document.getElementById("versionNote").textContent = "Dashboard v" + DATA.dashboard_version;
 
 const SUBSTANCES = DATA.overall.substances;
 const lots = DATA.lots;
