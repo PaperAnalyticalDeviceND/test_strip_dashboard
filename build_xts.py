@@ -99,8 +99,8 @@ def parse_records(header, rows):
         dt = excel_serial_to_dt(r[COL['ts']])
         if not r[COL['brand']].strip() or not r[COL['lot']].strip() or dt is None:
             continue
-        photos = [u.strip() for u in r[COL['photos']].split(',') if u.strip()] + \
-            [u.strip() for u in r[COL['strip_photos']].split(',') if u.strip()]
+        photos = [{'url': u.strip(), 'kind': 'packaging'} for u in r[COL['photos']].split(',') if u.strip()] + \
+            [{'url': u.strip(), 'kind': 'strip'} for u in r[COL['strip_photos']].split(',') if u.strip()]
         interference = {}
         for i, sub in enumerate(SUBSTANCES):
             interference[sub] = {'HI': r[HI[i]], 'MED': r[MED[i]], 'LO': r[LO[i]]}
@@ -124,7 +124,10 @@ def build_dashboard_data(records):
         'brand': '', 'lot': '', 'expirations': set(), 'submissions': [], 'testers': set(), 'photos': [],
         'tp': {'2500_di': [0, 0, 0], '2500_tap': [0, 0, 0], '1000_di': [0, 0, 0]},
         'tn_run': 0, 'tn_pos': 0,
-        'sub_stats': defaultdict(lambda: {'run': 0, 'hits': 0, 'min_mg': None, 'min_intensity': None}),
+        'sub_stats': defaultdict(lambda: {
+            'run': 0, 'hits': 0, 'min_mg': None, 'min_intensity': None,
+            'by_level': {'HI': {'run': 0, 'hits': 0}, 'MED': {'run': 0, 'hits': 0}, 'LO': {'run': 0, 'hits': 0}},
+        }),
     })
     sub_rows = []
     for idx, r in enumerate(records):
@@ -159,8 +162,10 @@ def build_dashboard_data(records):
                     continue
                 st = L['sub_stats'][sub]
                 st['run'] += 1
+                st['by_level'][level]['run'] += 1
                 if res['reads_positive']:
                     st['hits'] += 1
+                    st['by_level'][level]['hits'] += 1
                     mg = LEVEL_MG[level]
                     if st['min_mg'] is None or mg < st['min_mg']:
                         st['min_mg'] = mg
@@ -177,7 +182,7 @@ def build_dashboard_data(records):
             'post_exp': post_exp,
             'tp_2500_di': r['tp_2500_di'], 'tp_2500_tap': r['tp_2500_tap'], 'tp_1000_di': r['tp_1000_di'],
             'tn_water': tn, 'interferents_flagged': row_flags,
-            'n_photos': len(r['photos']), 'first_photo': r['photos'][0] if r['photos'] else None,
+            'n_photos': len(r['photos']), 'first_photo': r['photos'][0]['url'] if r['photos'] else None,
             'notes': r['notes'], 'source': r['source'],
         })
 
@@ -189,7 +194,14 @@ def build_dashboard_data(records):
             if st['hits'] > 0:
                 interferents.append({'substance': sub, 'label': SUB_LABEL[sub], 'min_mg_ml': st['min_mg'], 'min_intensity': st['min_intensity'], 'hits': st['hits'], 'run': st['run']})
         interferents.sort(key=lambda x: x['min_mg_ml'])
-        matrix = {sub: {'run': L['sub_stats'][sub]['run'], 'hits': L['sub_stats'][sub]['hits'], 'min_mg': L['sub_stats'][sub]['min_mg'], 'min_intensity': L['sub_stats'][sub]['min_intensity']} for sub in SUBSTANCES}
+        matrix = {
+            sub: {
+                'run': L['sub_stats'][sub]['run'], 'hits': L['sub_stats'][sub]['hits'],
+                'min_mg': L['sub_stats'][sub]['min_mg'], 'min_intensity': L['sub_stats'][sub]['min_intensity'],
+                'by_level': L['sub_stats'][sub]['by_level'],
+            }
+            for sub in SUBSTANCES
+        }
 
         def rate(pair):
             run, pos = pair[0], pair[1]
@@ -212,7 +224,9 @@ def build_dashboard_data(records):
             'tn_run': run_tn, 'tn_pos': L['tn_pos'],
             'tn_specificity_rate': round(100 * (run_tn - L['tn_pos']) / run_tn, 1) if run_tn else None,
             'interferents': interferents, 'matrix': matrix,
-            'n_photos': len(L['photos']), 'first_photo': L['photos'][0] if L['photos'] else None,
+            'n_photos': len(L['photos']), 'first_photo': L['photos'][0]['url'] if L['photos'] else None,
+            'n_photos_packaging': sum(1 for p in L['photos'] if p['kind'] == 'packaging'),
+            'n_photos_strip': sum(1 for p in L['photos'] if p['kind'] == 'strip'),
         })
     lot_out.sort(key=lambda x: (x['tp_2500_di_rate'] if x['tp_2500_di_rate'] is not None else 999))
     sub_rows.sort(key=lambda s: s['ts_sort'], reverse=True)
@@ -250,8 +264,8 @@ def build_photos_by_lot(records, photos_dir):
     attempted = failed = skipped_dupes = 0
     for r in records:
         k = lotkey(r['brand'], r['lot'])
-        for u in r['photos']:
-            fid = extract_drive_file_id(u)
+        for p in r['photos']:
+            fid = extract_drive_file_id(p['url'])
             if not fid:
                 continue
             raw_candidates = [f for f in os.listdir(photos_dir) if f.startswith(fid + '.')] if os.path.isdir(photos_dir) else []
@@ -277,7 +291,7 @@ def build_photos_by_lot(records, photos_dir):
                 if os.path.exists(out_jpg):
                     os.remove(out_jpg)
             photos_by_lot.setdefault(k, []).append({
-                'b64': b64, 'tester': r['name'], 'date': r['dt'].strftime('%Y-%m-%d'),
+                'b64': b64, 'tester': r['name'], 'date': r['dt'].strftime('%Y-%m-%d'), 'kind': p['kind'],
             })
     if missing:
         print(f'WARN: {len(missing)} photo(s) referenced in the sheet were not found in {photos_dir}: {missing}', file=sys.stderr)

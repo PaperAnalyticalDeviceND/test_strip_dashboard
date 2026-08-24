@@ -53,11 +53,17 @@ def parse_xlsx_sheet(xlsx_path, sheet_file='xl/worksheets/sheet1.xml'):
     every subsequent row that has a non-empty first cell.
     """
     z = zipfile.ZipFile(xlsx_path)
-    sst_root = ET.fromstring(z.read('xl/sharedStrings.xml'))
     shared = []
-    for si in sst_root.findall(f'{NS}si'):
-        texts = si.findall(f'.//{NS}t')
-        shared.append(''.join(t.text or '' for t in texts))
+    if 'xl/sharedStrings.xml' in z.namelist():
+        # Every real Google Sheets xlsx export has this part. Some writers
+        # (e.g. openpyxl, used only for local test fixtures) skip it
+        # entirely and inline every string with t="inlineStr" instead --
+        # tolerate that rather than crash, since inline strings are already
+        # handled below regardless of whether this table exists.
+        sst_root = ET.fromstring(z.read('xl/sharedStrings.xml'))
+        for si in sst_root.findall(f'{NS}si'):
+            texts = si.findall(f'.//{NS}t')
+            shared.append(''.join(t.text or '' for t in texts))
 
     root = ET.fromstring(z.read(sheet_file))
     sheetdata = root.find(f'{NS}sheetData')
@@ -177,15 +183,38 @@ def reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey_fn):
     references from the sheet; build_photos_by_lot() then drops references
     whose file isn't on disk and collapses duplicate-content uploads. Without
     this reconciliation the "N photos" badge can promise more than the
-    gallery delivers when it's clicked."""
+    gallery delivers when it's clicked.
+
+    Also reconciles n_photos_packaging/n_photos_strip the same way, from
+    each photo dict's 'kind' tag (set in build_photos_by_lot()) -- the
+    lot-checking progress tracker needs to know packaging and strip photos
+    were counted separately, not just that some photo exists."""
     for lot in dashboard_data['lots']:
         key = lotkey_fn(lot['brand'], lot['lot'])
-        lot['n_photos'] = len(photos_by_lot.get(key, []))
+        photos = photos_by_lot.get(key, [])
+        lot['n_photos'] = len(photos)
+        lot['n_photos_packaging'] = sum(1 for p in photos if p.get('kind') == 'packaging')
+        lot['n_photos_strip'] = sum(1 for p in photos if p.get('kind') == 'strip')
 
 
 # ---------------------------------------------------------------------------
 # Safe embedding into an HTML <script> tag
 # ---------------------------------------------------------------------------
+
+def extract_dashboard_data(dashboard_html_path):
+    """Pull the whole embedded `const DATA = {...};` blob back out of an
+    already-built dashboard HTML file (build_fts.py's/build_xts.py's own
+    output). Used by build_hub.py (which only wants ['overall']) and
+    build_progress.py (which wants the full ['lots'] list) so a lot's
+    testing status is read once, from the one place it's actually
+    computed, instead of being re-derived from the raw sheet a second
+    time by a parallel parser that could drift from the real one."""
+    html = open(dashboard_html_path, encoding='utf-8').read()
+    m = re.search(r'const DATA = (.*?);\n', html)
+    if not m:
+        raise RuntimeError(f'could not find `const DATA = ...;` in {dashboard_html_path}')
+    return json.loads(m.group(1))
+
 
 def embed_json_in_script(json_obj):
     """json.dumps() a value for direct embedding inside a <script> tag.

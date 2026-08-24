@@ -10,17 +10,15 @@ overall stats, so the hub's target cards never drift from what the
 dashboards themselves say. Everything else on the hub is static content
 from the template.
 """
-import json
-import re
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import extract_dashboard_data
 
 
 def extract_overall(dashboard_html_path):
-    html = open(dashboard_html_path, encoding='utf-8').read()
-    m = re.search(r'const DATA = (.*?);\n', html)
-    if not m:
-        raise RuntimeError(f'could not find `const DATA = ...;` in {dashboard_html_path}')
-    return json.loads(m.group(1))['overall']
+    return extract_dashboard_data(dashboard_html_path)['overall']
 
 
 def main():

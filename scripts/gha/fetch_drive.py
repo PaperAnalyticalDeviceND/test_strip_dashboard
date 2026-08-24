@@ -106,9 +106,12 @@ def download_binary_file(drive, file_id: str, out_dir: Path) -> Path | None:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--sheet-id", required=True, help="Google Sheet file ID (from the URL)")
-    p.add_argument("--photo-column", type=int, action="append", required=True,
+    p.add_argument("--photo-column", type=int, action="append", default=[],
                    help="0-indexed column with comma-separated photo Drive URLs / IDs; "
-                        "pass multiple times to pull photos from more than one column")
+                        "pass multiple times to pull photos from more than one column. "
+                        "Omit entirely for a sheet with no photo columns (e.g. the lot "
+                        "intake form) -- --out-photos-dir is still required but will just "
+                        "end up empty.")
     p.add_argument("--out-xlsx", required=True, help="Path to write the exported .xlsx")
     p.add_argument("--out-photos-dir", required=True, help="Directory to write photos into")
     p.add_argument("--sa-json", required=True, help="Path to the service-account JSON key")
