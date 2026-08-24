@@ -1,45 +1,63 @@
 {
-  "pulled_at": "2026-08-12T18:57:01Z",
+  "pulled_at": "2026-08-24T02:53:47Z",
   "period_start": "2026-08-01T00:00:00Z",
-  "period_end": "2026-08-12T18:56:59Z",
-  "total_pageviews": 10,
-  "total_events": 3,
+  "period_end": "2026-08-24T02:53:46Z",
+  "total_pageviews": 115,
+  "total_events": 32,
   "pages": [
     {
       "path": "/test_strip_dashboard",
       "title": "Lieberman Lab \u2014 Test Strip Lot Checking Program",
       "is_event": false,
-      "count": 3
-    },
-    {
-      "path": "/test_strip_dashboard/xts.html",
-      "title": "XTS Lot Characteristics \u2014 Lieberman Lab",
-      "is_event": false,
-      "count": 2
+      "count": 45
     },
     {
       "path": "/test_strip_dashboard/fts.html",
       "title": "FTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 2
+      "count": 21
     },
     {
-      "path": "xts-view-matrix",
-      "title": "XTS view: matrix",
-      "is_event": true,
-      "count": 1
-    },
-    {
-      "path": "fts-view-log",
-      "title": "FTS view: log",
-      "is_event": true,
-      "count": 1
+      "path": "/test_strip_dashboard/xts.html",
+      "title": "XTS Lot Characteristics \u2014 Lieberman Lab",
+      "is_event": false,
+      "count": 17
     },
     {
       "path": "fts-view-matrix",
       "title": "FTS view: matrix",
       "is_event": true,
-      "count": 1
+      "count": 8
+    },
+    {
+      "path": "xts-view-matrix",
+      "title": "XTS view: matrix",
+      "is_event": true,
+      "count": 7
+    },
+    {
+      "path": "fts-view-log",
+      "title": "FTS view: log",
+      "is_event": true,
+      "count": 6
+    },
+    {
+      "path": "xts-view-lots",
+      "title": "XTS view: lots",
+      "is_event": true,
+      "count": 4
+    },
+    {
+      "path": "fts-view-lots",
+      "title": "FTS view: lots",
+      "is_event": true,
+      "count": 4
+    },
+    {
+      "path": "xts-view-log",
+      "title": "XTS view: log",
+      "is_event": true,
+      "count": 3
     }
   ],
   "more_pages_not_shown": false
