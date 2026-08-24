@@ -14,6 +14,7 @@ convention the dashboard builds already follow.
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -26,6 +27,17 @@ SITE = "https://liebermandashboards.goatcounter.com"
 TRACKING_STARTED = "2026-08-01T00:00:00Z"
 
 
+# Empirically flaky, not a code bug: the exact same request (same token, same
+# params) has failed with a bare 404 {"error":"not found"} from GoatCounter's
+# own API and then succeeded on an unmodified retry minutes later, more than
+# once (see wiki Automation/log for the run history that established this --
+# 4 of 6 real attempts between 2026-08-12 and 2026-08-24 failed this way).
+# Retry a few times with backoff before giving up, rather than failing the
+# whole weekly snapshot on what's usually a transient upstream hiccup.
+RETRY_ATTEMPTS = 4
+RETRY_BACKOFF_SECONDS = 3
+
+
 def api_get(token, path, params=None):
     url = f"{SITE}/api/v0{path}"
     if params:
@@ -36,14 +48,19 @@ def api_get(token, path, params=None):
         "Content-Type": "application/json",
         "User-Agent": "test_strip_dashboard-goatcounter-snapshot/1.0",
     })
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode('utf-8', errors='replace')
-        print(f"HTTPError {e.code} for {url}\nResponse headers: {dict(e.headers)}\nBody: {body[:2000]}",
-              file=sys.stderr)
-        raise
+    last_error = None
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace')
+            print(f"HTTPError {e.code} for {url} (attempt {attempt}/{RETRY_ATTEMPTS})\n"
+                  f"Response headers: {dict(e.headers)}\nBody: {body[:2000]}", file=sys.stderr)
+            last_error = e
+            if attempt < RETRY_ATTEMPTS:
+                time.sleep(RETRY_BACKOFF_SECONDS * attempt)
+    raise last_error
 
 
 def main():
