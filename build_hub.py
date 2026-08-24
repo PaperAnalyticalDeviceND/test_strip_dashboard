@@ -12,9 +12,10 @@ from the template.
 """
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import extract_dashboard_data
+from common import extract_dashboard_data, DASHBOARD_VERSION
 
 
 def extract_overall(dashboard_html_path):
@@ -39,6 +40,7 @@ def main():
         '__XTS_SUBS__': str(xts['n_submissions']),
         '__XTS_DI_RATE__': f"{xts['pooled_2500_di_rate']:.1f}",
         '__XTS_TAP_RATE__': f"{xts['pooled_2500_tap_rate']:.1f}",
+        '__HUB_VERSION_NOTE__': f"Dashboard v{DASHBOARD_VERSION} &middot; updated {datetime.now().strftime('%B %-d, %Y')}",
     }
     missing = [k for k in replacements if k not in html]
     if missing:
