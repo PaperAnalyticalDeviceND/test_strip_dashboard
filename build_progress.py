@@ -35,19 +35,23 @@ from common import (
 )
 from completion_rules import STRIP_TYPES
 
-# Must match the live Form's "What are you submitting?" radio option text
-# exactly -- see the wiki's Lot-Checking-Progress-Tracker.md for the full
-# drafted form layout.
+# Must match the live Form's "What are you submitting to the progress
+# tracker?" radio option text exactly. Verified 2026-08-24 against the real
+# "Lot checking intake form (Responses)" sheet -- Marya's actual wording for
+# the BOLO branch differs from the original draft ("Be on the lookout..."
+# vs. "Request a brand/lot to purchase").
 BRANCH_INTAKE = 'New lot received'
-BRANCH_BOLO = 'Request a brand/lot to purchase'
+BRANCH_BOLO = 'Be on the lookout for this brand/lot to purchase'
 
-# DRAFT column positions -- the Form doesn't exist yet as of this write.
-# Re-verify against the real sheet's header row before trusting a rebuild.
+# Column positions verified 2026-08-24 against the real sheet's header row
+# (previously a pre-Form draft -- the real form has one field the draft
+# didn't, intake_expiration, which shifted every field after it by one).
+# Re-verify again if the form's question order ever changes.
 COL = dict(
     ts=0, email=1, name=2, branch=3,
-    intake_strip_type=4, intake_brand=5, intake_lot=6, intake_date_received=7,
-    intake_qty=8, intake_notes=9,
-    bolo_product=10, bolo_strip_type=11, bolo_reason=12,
+    intake_strip_type=4, intake_brand=5, intake_lot=6, intake_expiration=7,
+    intake_date_received=8, intake_qty=9, intake_notes=10,
+    bolo_product=11, bolo_strip_type=12, bolo_reason=13,
 )
 
 
@@ -85,6 +89,7 @@ def parse_intake_rows(rows):
             intake.append({
                 'dt': dt, 'name': name, 'strip_type': strip_type,
                 'brand': brand, 'lot': fix_numeric_id(lot),
+                'expiration': excel_serial_to_dt(r[COL['intake_expiration']]),
                 'date_received': excel_serial_to_dt(r[COL['intake_date_received']]),
                 'qty': qty,
                 'notes': r[COL['intake_notes']].strip() if len(r) > COL['intake_notes'] else '',
@@ -119,6 +124,10 @@ def group_intake_by_lot(intake_events):
             'first_received': min(received_dates).strftime('%Y-%m-%d') if received_dates else None,
             'total_qty': sum(e['qty'] for e in events if e['qty'] is not None) or None,
             'notes': next((e['notes'] for e in reversed(events) if e['notes']), ''),
+            # Most recently-logged expiration wins if it's ever entered more
+            # than once for the same lot (e.g. a correction) -- same
+            # "trust the latest entry" convention as `notes` above.
+            'expiration': next((e['expiration'].strftime('%Y-%m-%d') for e in reversed(events) if e['expiration']), None),
         }
     return out
 
@@ -221,6 +230,7 @@ def merge_lots(intake_by_lot, dashboards):
             'first_received': intake['first_received'] if intake else None,
             'total_qty': intake['total_qty'] if intake else None,
             'intake_notes': intake['notes'] if intake else '',
+            'expiration': intake['expiration'] if intake else None,
             'n_submissions': d.get('n_submissions', 0),
             'first_submitted': d.get('first_submitted'), 'last_submitted': d.get('last_submitted'),
             'complete': completion['complete'] if completion else None,
