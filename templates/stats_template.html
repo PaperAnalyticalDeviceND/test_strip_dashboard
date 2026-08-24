@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Usage stats — Lieberman Lab dashboards</title>
+<style>
+  :root{
+    --bg:#f2f5f3;
+    --surface:#ffffff;
+    --surface-2:#e8ede9;
+    --ink:#131c18;
+    --ink-2:#44544c;
+    --ink-3:#76867d;
+    --border:#d3dbd4;
+    --border-strong:#b9c4bb;
+    --accent:#0d6e63;
+    --accent-tint:#e2f0ec;
+    --accent-tint-border:#bcdcd3;
+    --good:#1c7c4d;
+    --good-tint:#e4f3e8;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", Georgia, serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --shadow: 0 1px 2px rgba(20,30,25,.04), 0 1px 8px rgba(20,30,25,.03);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#101512; --surface:#161d19; --surface-2:#1d2521;
+      --ink:#e9efe9; --ink-2:#aebbb2; --ink-3:#7c8b82;
+      --border:#2a352e; --border-strong:#3a473e;
+      --accent:#4fbfa8; --accent-tint:#172b27; --accent-tint-border:#25423b;
+      --good:#57c383; --good-tint:#15271d;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 8px rgba(0,0,0,.2);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#101512; --surface:#161d19; --surface-2:#1d2521;
+    --ink:#e9efe9; --ink-2:#aebbb2; --ink-3:#7c8b82;
+    --border:#2a352e; --border-strong:#3a473e;
+    --accent:#4fbfa8; --accent-tint:#172b27; --accent-tint-border:#25423b;
+    --good:#57c383; --good-tint:#15271d;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 8px rgba(0,0,0,.2);
+  }
+  :root[data-theme="light"]{
+    --bg:#f2f5f3; --surface:#ffffff; --surface-2:#e8ede9;
+    --ink:#131c18; --ink-2:#44544c; --ink-3:#76867d;
+    --border:#d3dbd4; --border-strong:#b9c4bb;
+    --accent:#0d6e63; --accent-tint:#e2f0ec; --accent-tint-border:#bcdcd3;
+    --good:#1c7c4d; --good-tint:#e4f3e8;
+    --shadow: 0 1px 2px rgba(20,30,25,.04), 0 1px 8px rgba(20,30,25,.03);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);line-height:1.55;}
+  body{max-width:760px;margin:0 auto;padding:28px 24px 64px;}
+  .eyebrow{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+  h1{font-family:var(--font-display);font-weight:600;font-size:30px;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance;}
+  .sub{color:var(--ink-2);font-size:14.5px;margin:0 0 24px;max-width:56ch;}
+  .sub code{font-family:var(--font-mono);background:var(--surface-2);padding:1px 5px;border-radius:3px;font-size:.92em;}
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:28px;box-shadow:var(--shadow);}
+  .stat{background:var(--surface);padding:16px 18px;}
+  .stat .label{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:8px;}
+  .stat .value{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:26px;font-weight:600;color:var(--ink);}
+  .stat .foot{font-size:12px;color:var(--ink-3);margin-top:4px;}
+  @media (max-width:560px){ .stat-row{grid-template-columns:1fr;} }
+  section{margin-bottom:28px;}
+  h2{font-family:var(--font-display);font-size:18px;margin:0 0 4px;font-weight:600;}
+  .section-note{font-size:12.5px;color:var(--ink-3);margin:0 0 14px;}
+  .rank-list{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;}
+  .rank-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--border);}
+  .rank-row:last-child{border-bottom:none;}
+  .rank-count{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:600;color:var(--accent);width:34px;text-align:right;flex-shrink:0;}
+  .rank-bar-wrap{flex:1;min-width:0;}
+  .rank-name{font-size:14px;color:var(--ink);font-weight:500;}
+  .rank-path{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-top:1px;}
+  .rank-bar-track{height:5px;background:var(--surface-2);border-radius:3px;margin-top:7px;overflow:hidden;}
+  .rank-bar-fill{height:100%;background:var(--accent);border-radius:3px;}
+  .chip{display:inline-flex;align-items:center;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;background:var(--good-tint);color:var(--good);flex-shrink:0;}
+  footer{border-top:1px solid var(--border);padding-top:16px;margin-top:8px;font-size:12.5px;color:var(--ink-3);}
+  footer code{background:var(--surface-2);padding:1px 5px;border-radius:3px;font-size:.92em;}
+  footer a{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<div class="eyebrow">Lieberman Lab &middot; Test Strip Lot Checking Program</div>
+<h1>Dashboard usage stats</h1>
+<p class="sub">Pulled from GoatCounter, committed into <code>analytics/goatcounter/snapshot.json</code> on <code>main</code> every week. This page reads that one snapshot &mdash; no login, no GoatCounter site needed.</p>
+
+<div class="stat-row" id="statRow"></div>
+
+<section>
+  <h2>Pages loaded</h2>
+  <p class="section-note">Full page views, by destination.</p>
+  <div class="rank-list" id="pagesList"></div>
+</section>
+
+<section>
+  <h2>In-page views</h2>
+  <p class="section-note">Which tab people switch to inside the FTS/XTS dashboards &mdash; Lots overview, Interference matrix, Submission log.</p>
+  <div class="rank-list" id="eventsList"></div>
+</section>
+
+<footer id="footerNote"></footer>
+
+<script>
+const DATA = __STATS_DATA__;
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+const pages = DATA.pages.filter(p => !p.is_event).sort((a,b)=>b.count-a.count);
+const events = DATA.pages.filter(p => p.is_event).sort((a,b)=>b.count-a.count);
+const maxPage = Math.max(1, ...pages.map(p=>p.count));
+const maxEvent = Math.max(1, ...events.map(p=>p.count));
+
+document.getElementById('statRow').innerHTML = `
+  <div class="stat">
+    <div class="label">Total pageviews</div>
+    <div class="value">${DATA.total_pageviews}</div>
+    <div class="foot">across all 3 pages</div>
+  </div>
+  <div class="stat">
+    <div class="label">In-page view switches</div>
+    <div class="value">${DATA.total_events}</div>
+    <div class="foot">tab clicks inside FTS/XTS</div>
+  </div>
+  <div class="stat">
+    <div class="label">Tracking since</div>
+    <div class="value" style="font-size:17px;">${fmtDate(DATA.period_start)}</div>
+    <div class="foot">last pulled ${fmtDate(DATA.pulled_at)}</div>
+  </div>
+`;
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pageLabel(p){
+  if (p.path === '/test_strip_dashboard' || p.path === '/test_strip_dashboard/') return 'Hub';
+  if (p.path.endsWith('fts.html')) return 'FTS dashboard';
+  if (p.path.endsWith('xts.html')) return 'XTS dashboard';
+  return p.title || p.path;
+}
+
+document.getElementById('pagesList').innerHTML = pages.map(p => `
+  <div class="rank-row">
+    <div class="rank-count">${p.count}</div>
+    <div class="rank-bar-wrap">
+      <div class="rank-name">${esc(pageLabel(p))}</div>
+      <div class="rank-path">${esc(p.path)}</div>
+      <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${(p.count/maxPage*100).toFixed(0)}%"></div></div>
+    </div>
+  </div>
+`).join('') || '<div class="rank-row"><div class="rank-name" style="color:var(--ink-3)">No page views recorded yet.</div></div>';
+
+document.getElementById('eventsList').innerHTML = events.map(p => `
+  <div class="rank-row">
+    <div class="rank-count">${p.count}</div>
+    <div class="rank-bar-wrap">
+      <div class="rank-name">${esc(p.title || p.path)} <span class="chip">event</span></div>
+      <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${(p.count/maxEvent*100).toFixed(0)}%"></div></div>
+    </div>
+  </div>
+`).join('') || '<div class="rank-row"><div class="rank-name" style="color:var(--ink-3)">No view switches recorded yet.</div></div>';
+
+document.getElementById('footerNote').innerHTML = `
+  Numbers reflect ${fmtDate(DATA.period_start)} through ${fmtDate(DATA.period_end)}, refreshed automatically every week by
+  <code>.github/workflows/goatcounter-snapshot.yml</code>. This is a static snapshot of one file in the repo &mdash;
+  to see live/current numbers, check
+  <a href="https://github.com/PaperAnalyticalDeviceND/test_strip_dashboard/blob/main/analytics/goatcounter/snapshot.json" target="_blank" rel="noopener">the file on GitHub</a>
+  (its "History" button shows the trend week to week), or trigger the workflow manually via
+  <code>gh workflow run goatcounter-snapshot</code> for a fresher pull right now.
+`;
+</script>
+</body>
+</html>
