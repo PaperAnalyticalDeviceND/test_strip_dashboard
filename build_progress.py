@@ -82,9 +82,15 @@ def parse_intake_rows(rows):
             if not brand or not lot or not strip_type:
                 continue
             qty_raw = r[COL['intake_qty']].strip()
+            # A free-text cell anyone with form access can type into --
+            # tolerate "inf"/"nan"/absurd numbers (float() parses all of
+            # these without error) rather than crash the whole build, or
+            # let a joke/garbage entry silently poison total_qty sums.
             try:
                 qty = int(float(qty_raw)) if qty_raw else None
-            except ValueError:
+                if qty is not None and not (0 <= qty <= 100_000):
+                    qty = None
+            except (ValueError, OverflowError):
                 qty = None
             intake.append({
                 'dt': dt, 'name': name, 'strip_type': strip_type,

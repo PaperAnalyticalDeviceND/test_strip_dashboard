@@ -91,9 +91,21 @@ jobs:
         run: |
           python3 build_xts.py responses_xts.xlsx photos_xts _build/xts.html
 
-      - name: Build hub (live stats pulled from the two dashboards above)
+      - name: Fetch lot-intake response sheet from Google Drive
         run: |
-          python3 build_hub.py _build/fts.html _build/xts.html templates/hub_template.html _build/index.html
+          python3 scripts/gha/fetch_drive.py \
+            --sheet-id '1iy-zC7mB6U6QjqG2jtnHPdQqfV3h7GM1veK3493K4IE' \
+            --out-xlsx responses_intake.xlsx \
+            --out-photos-dir photos_intake \
+            --sa-json .secrets/gdrive_sa.json
+
+      - name: Build lot checking progress tracker
+        run: |
+          python3 build_progress.py responses_intake.xlsx _build/fts.html _build/xts.html _build/progress.html
+
+      - name: Build hub (live stats pulled from the dashboards above)
+        run: |
+          python3 build_hub.py _build/fts.html _build/xts.html _build/progress.html templates/hub_template.html _build/index.html
 
       - name: Wipe secret file before publish
         if: always()
@@ -112,6 +124,7 @@ jobs:
           cd /tmp/gh-pages-worktree
           git add fts.html || true
           git add xts.html || true
+          git add progress.html || true
           git add index.html || true
           if git diff --cached --quiet; then
             echo "no changes to publish"

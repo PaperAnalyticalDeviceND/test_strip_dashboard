@@ -38,11 +38,19 @@ def col_num(letters):
 
 
 def excel_serial_to_dt(s):
+    """Returns None, not a crash, for anything that isn't a real date serial
+    -- including adversarial or just malformed free-text cell values like
+    "inf"/"Infinity"/"nan"/a huge number, all of which float() happily
+    parses but datetime + timedelta cannot represent (OverflowError/
+    ValueError). Every response sheet this project reads (FTS, XTS, the
+    lot-intake form) is a text field anyone with form access can type into,
+    so this needs to fail closed rather than take down the whole weekly
+    build over one bad cell in one row."""
     try:
         serial = float(s)
-    except (TypeError, ValueError):
+        return datetime(1899, 12, 30) + timedelta(days=serial)
+    except (TypeError, ValueError, OverflowError):
         return None
-    return datetime(1899, 12, 30) + timedelta(days=serial)
 
 
 def parse_xlsx_sheet(xlsx_path, sheet_file='xl/worksheets/sheet1.xml'):
