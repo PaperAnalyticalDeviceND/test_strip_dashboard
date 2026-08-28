@@ -2,61 +2,20 @@ name: test-harness
 
 # This harness tests the llm-wiki-memory-template tooling itself (scripts/
 # test, scripts/lib, the top-level scripts/*.sh entry points, llm-wiki.md)
-# -- it has nothing to do with the dashboard build scripts (build_fts.py
-# etc.) or the published site, so it's paths-scoped to not fire on changes
-# that can't affect what it tests. An exclude list, not an include list,
-# on purpose: missing a real dependency from an include list silently
-# drops real coverage, where missing something from this exclude list just
-# means an occasional unnecessary run -- the safer failure mode. Found
-# 2026-08-24 after a run of dashboard-only commits (no template-tooling
-# changes at all) burned real GitHub Actions minutes -- 2 of this
-# workflow's 7 jobs run on macOS, billed at 10x a Linux minute, on every
-# single push to every branch.
+# -- not the dashboard build scripts or the published site. Manual-trigger
+# only, not automatic on push/PR: the tooling this tests has been touched
+# exactly once in this repo's entire history (the initial "moved to llm
+# wiki" setup commit) and never modified since, while the automatic
+# trigger fired the full 7-job matrix -- 2 of them on macOS, billed at
+# 10x a Linux minute -- 23 times, almost all on unrelated dashboard-only
+# commits. Real GitHub Actions cost for effectively zero realized
+# protective value in this downstream-consumer repo (found 2026-08-24,
+# contributed to a billing block). Kept as workflow_dispatch rather than
+# deleted outright so there's still a way to sanity-check the tooling by
+# hand before ever running scripts/update-from-template.sh again -- the
+# one scenario where it would actually matter.
 on:
-  push:
-    branches: ["**"]
-    paths-ignore:
-      - "build_*.py"
-      - "common.py"
-      - "completion_rules.py"
-      - "templates/**"
-      - "analytics/**"
-      - "scripts/gha/**"
-      - "scripts/weekly_update/**"
-      - "data/**"
-      - "photos_fts/**"
-      - "photos_xts/**"
-      - ".github/workflows/weekly-update.yml"
-      - ".github/workflows/goatcounter-snapshot.yml"
-      - "README.md"
-      - "SETUP.md"
-      - "wiki/test_strip_dashboard.wiki/**"
-  pull_request:
-    paths-ignore:
-      - "build_*.py"
-      - "common.py"
-      - "completion_rules.py"
-      - "templates/**"
-      - "analytics/**"
-      - "scripts/gha/**"
-      - "scripts/weekly_update/**"
-      - "data/**"
-      - "photos_fts/**"
-      - "photos_xts/**"
-      - ".github/workflows/weekly-update.yml"
-      - ".github/workflows/goatcounter-snapshot.yml"
-      - "README.md"
-      - "SETUP.md"
-      - "wiki/test_strip_dashboard.wiki/**"
-
-# Cancel a still-running run of this same workflow on the same branch when
-# a newer push comes in -- doesn't reduce what gets tested (the latest
-# commit's run always finishes), just stops paying for now-superseded
-# intermediate states from a burst of rapid pushes. Scoped by ref so
-# concurrent branches don't cancel each other.
-concurrency:
-  group: test-harness-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 # Python graph deps (pyyaml/rdflib/pyshacl) go through a venv on every job.
 # pyshacl is not packaged in apt and old ubuntu's pip rejects PEP 668's
