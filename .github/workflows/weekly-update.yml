@@ -99,9 +99,17 @@ jobs:
             --out-photos-dir photos_intake \
             --sa-json .secrets/gdrive_sa.json
 
+      - name: Fetch lot-feedback response sheet from Google Drive
+        run: |
+          python3 scripts/gha/fetch_drive.py \
+            --sheet-id '15wZHFE13Q77jpNlcT_8OOcwOkIridAiVprVV3Hqd6s4' \
+            --out-xlsx responses_feedback.xlsx \
+            --out-photos-dir photos_feedback \
+            --sa-json .secrets/gdrive_sa.json
+
       - name: Build lot checking progress tracker
         run: |
-          python3 build_progress.py responses_intake.xlsx _build/fts.html _build/xts.html _build/progress.html
+          python3 build_progress.py responses_intake.xlsx responses_feedback.xlsx _build/fts.html _build/xts.html _build/progress.html
 
       - name: Build hub (live stats pulled from the dashboards above)
         run: |

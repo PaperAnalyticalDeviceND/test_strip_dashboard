@@ -64,6 +64,10 @@
   .status-badge.incomplete{background:var(--warn-tint);color:var(--warn);}
   .status-badge.untested{background:var(--surface-2);color:var(--ink-3);}
   .status-badge.unsupported{background:var(--surface-2);color:var(--ink-3);}
+  .status-badge.tested{background:var(--good-tint);color:var(--good);}
+  .status-badge.received{background:var(--accent-tint);color:var(--accent);}
+  .status-badge.not_yet_acquired{background:var(--warn-tint);color:var(--warn);}
+  .status-badge.in_lab_reported{background:var(--surface-2);color:var(--ink-3);}
 
   .table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
   table.lot-table{border-collapse:collapse;width:100%;min-width:920px;}
@@ -81,11 +85,7 @@
   table.lot-table a.dash-link{color:var(--accent);text-decoration:none;font-family:var(--font-mono);font-size:11.5px;white-space:nowrap;}
   table.lot-table a.dash-link:hover{text-decoration:underline;}
 
-  .bolo-list{display:flex;flex-direction:column;gap:10px;}
-  .bolo-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);}
-  .bolo-card .product{font-family:var(--font-display);font-size:16px;font-weight:600;}
-  .bolo-card .meta{font-size:12px;color:var(--ink-3);margin-top:2px;}
-  .bolo-card .reason{font-size:13.5px;color:var(--ink-2);margin-top:8px;}
+  .bolo-summary{font-size:12.5px;color:var(--ink-2);margin-bottom:12px;}
 
   .empty-state{padding:40px;text-align:center;color:var(--ink-3);font-size:13px;}
   footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-3);line-height:1.7;}
@@ -134,11 +134,39 @@
   </section>
 
   <section class="view" id="view-bolo">
-    <div class="bolo-list" id="boloList"></div>
+    <div class="bolo-summary" id="boloSummary"></div>
+    <div class="toolbar" id="boloToolbar">
+      <div class="search" id="boloSearchWrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="boloSearchInput" type="text" placeholder="Search brand, lot, submitter&hellip;" autocomplete="off">
+      </div>
+      <select id="boloKindSelect">
+        <option value="">All types</option>
+        <option value="purchase_request">Purchase request</option>
+        <option value="interference_report">Interference report</option>
+        <option value="product_suggestion">Product suggestion</option>
+      </select>
+      <select id="boloStatusSelect">
+        <option value="">All statuses</option>
+        <option value="not_yet_acquired">Not yet acquired</option>
+        <option value="received">Received</option>
+        <option value="tested">Tested</option>
+        <option value="in_lab_reported">Reported (not in our dashboards)</option>
+      </select>
+      <select id="boloSortSelect">
+        <option value="newest">Sort: newest first</option>
+        <option value="oldest">Sort: oldest first</option>
+        <option value="brand">Sort: brand A&ndash;Z</option>
+      </select>
+      <div class="count" id="boloResultCount"></div>
+    </div>
+    <div class="table-wrap"><table class="lot-table" id="boloGrid"></table></div>
   </section>
 
   <footer>
     <strong>Method.</strong> "Complete" means testing coverage, not that the lot passed &mdash; a lot with a confirmed, fully-characterized interference still counts as complete. A lot is "complete" when every listed target has &ge;25 recorded detection runs, the true-negative-with-water check has &ge;5 runs, every listed interference substance has been run at 2&nbsp;mg/mL (and, if positive there, also run at 0.7 or 0.2&nbsp;mg/mL), and at least one packaging photo and one strip photo are on file. Run counts and photo counts are read directly from the FTS/XTS dashboards' own computed data, not re-derived from the raw sheets. "In lab" status and received-date come from the lot intake form; a lot with real test submissions but no logged intake row still appears here (most lots will look like this until students log them retroactively). Strip types without a completion checklist yet (no build script exists) show as "not yet supported" rather than complete or incomplete.
+    <br><br>
+    <strong>Be on the lookout.</strong> Entries come from two forms: a purchase request logged on the lot intake form, or an interference report / product suggestion logged on the "report an interference, or suggest a product" form. Status is matched against the same intake/dashboard records the Lots view uses: "not yet acquired" means nothing on file for that brand/lot yet; "received" means it's been logged as intake but not yet tested; "tested" means at least one real test submission exists. An interference report is about a strip someone already ran, so one that doesn't match our own records shows as "reported (not in our dashboards)" rather than "not yet acquired." Latency (days to acquire, days to first test) is computed from these same matched dates and only shown when known.
     <br><span id="versionNote"></span>
   </footer>
 </div>
@@ -290,25 +318,113 @@ function renderLots(){
   table.innerHTML = thead + `<tbody>${tbody}</tbody>`;
 }
 
+const BOLO_STATUS_LABEL = {
+  not_yet_acquired: 'Not yet acquired', received: 'Received', tested: 'Tested',
+  in_lab_reported: 'Reported (not in our dashboards)',
+};
+
+function boloSearchText(b){
+  return [b.brand, b.lot, b.submitter, b.org, b.reason, b.suspected, b.why_wrong,
+          b.marketed_substance, b.why_test, b.notes].join(' ').toLowerCase();
+}
+
+function boloDetail(b){
+  const bits = [];
+  if (b.kind === 'purchase_request' && b.reason) bits.push(esc(b.reason));
+  if (b.kind === 'interference_report') {
+    if (b.suspected) bits.push(`Suspected: ${esc(b.suspected)}`);
+    if (b.why_wrong) bits.push(`Why: ${esc(b.why_wrong)}`);
+    if (b.can_send_strip) bits.push(`Can send strip: ${esc(b.can_send_strip)}`);
+    if (b.has_photo) bits.push('Photo attached');
+  }
+  if (b.kind === 'product_suggestion') {
+    if (b.marketed_substance) bits.push(`Marketed for: ${esc(b.marketed_substance)}`);
+    if (b.why_test) bits.push(`Why test: ${esc(b.why_test)}`);
+    if (b.can_send_bulk) bits.push(`Can send 50-100: ${esc(b.can_send_bulk)}`);
+    if (b.notes) bits.push(esc(b.notes));
+  }
+  let latency = '';
+  if (b.days_to_acquire !== null) latency += `Acquired in ${b.days_to_acquire}d`;
+  if (b.days_to_test !== null) latency += (latency ? ' &middot; ' : '') + `tested ${b.days_to_test}d later`;
+  else if (b.days_report_to_test !== null) latency += (latency ? ' &middot; ' : '') + `tested ${b.days_report_to_test}d after report`;
+  const detailHtml = bits.join('<br>');
+  return detailHtml + (latency ? `<div style="color:var(--ink-3);font-size:11.5px;margin-top:4px;">${latency}</div>` : '');
+}
+
+function sortBolo(list, mode){
+  const arr = list.slice();
+  if (mode === 'oldest') arr.sort((a,b) => a.dt_sort.localeCompare(b.dt_sort));
+  else if (mode === 'brand') arr.sort((a,b) => a.brand.localeCompare(b.brand) || b.dt_sort.localeCompare(a.dt_sort));
+  else arr.sort((a,b) => b.dt_sort.localeCompare(a.dt_sort));
+  return arr;
+}
+
+function median(arr){
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a,b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m-1] + s[m]) / 2);
+}
+
 function renderBolo(){
-  const list = DATA.bolo;
-  const box = document.getElementById('boloList');
+  const q = document.getElementById('boloSearchInput').value.trim().toLowerCase();
+  const kindFilter = document.getElementById('boloKindSelect').value;
+  const statusFilter = document.getElementById('boloStatusSelect').value;
+  const sortMode = document.getElementById('boloSortSelect').value;
+
+  let list = DATA.bolo.filter(b => !q || boloSearchText(b).includes(q));
+  if (kindFilter) list = list.filter(b => b.kind === kindFilter);
+  if (statusFilter) list = list.filter(b => b.status === statusFilter);
+  list = sortBolo(list, sortMode);
+
+  document.getElementById('boloResultCount').textContent = `${list.length} of ${DATA.bolo.length}`;
+
+  const statusCounts = {};
+  for (const b of DATA.bolo) statusCounts[b.status] = (statusCounts[b.status] || 0) + 1;
+  const medAcq = median(DATA.bolo.map(b => b.days_to_acquire).filter(d => d !== null));
+  const medTest = median(DATA.bolo.map(b => b.days_to_test).filter(d => d !== null));
+  document.getElementById('boloSummary').innerHTML =
+    `${DATA.bolo.length} total &middot; ${statusCounts.not_yet_acquired||0} not yet acquired &middot; `
+    + `${statusCounts.received||0} received &middot; ${statusCounts.tested||0} tested &middot; `
+    + `${statusCounts.in_lab_reported||0} reported (not in our dashboards)`
+    + (medAcq !== null ? ` &middot; median ${medAcq}d to acquire` : '')
+    + (medTest !== null ? ` &middot; median ${medTest}d to first test` : '');
+
+  const grid = document.getElementById('boloGrid');
   if (!list.length) {
-    box.innerHTML = `<div class="empty-state">No open requests right now.</div>`;
+    grid.innerHTML = `<tbody><tr><td class="empty-state" colspan="9">No entries match this search/filter.</td></tr></tbody>`;
     return;
   }
-  box.innerHTML = list.map(b => `
-    <div class="bolo-card">
-      <div class="product">${esc(b.product)}</div>
-      <div class="meta">${esc(b.strip_type || 'strip type not specified')} &middot; requested ${esc(b.timestamp)} by ${esc(b.requester)}</div>
-      ${b.reason ? `<div class="reason">${esc(b.reason)}</div>` : ''}
-    </div>
+  const thead = `
+    <thead><tr>
+      <th>Date</th><th>How it arrived</th><th>Type</th><th>Status</th>
+      <th>Strip type</th><th>Brand / product</th><th>Lot</th><th>Submitted by</th><th>Details</th>
+    </tr></thead>
+  `;
+  const tbody = list.map(b => `
+    <tr>
+      <td class="mono">${esc(b.dt_display)}</td>
+      <td>${esc(b.source_label)}</td>
+      <td>${esc(b.kind_label)}</td>
+      <td><span class="status-badge ${esc(b.status)}">${esc(BOLO_STATUS_LABEL[b.status] || b.status)}</span></td>
+      <td>${b.strip_type ? esc(b.strip_type) : '&mdash;'}</td>
+      <td class="brand">${b.brand ? esc(b.brand) : '&mdash;'}</td>
+      <td class="lotnum mono">${b.lot ? esc(b.lot) : '&mdash;'}</td>
+      <td>${esc(b.submitter)}${b.org ? `<br><span style="color:var(--ink-3);font-size:11.5px;">${esc(b.org)}</span>` : ''}</td>
+      <td>${boloDetail(b)}</td>
+    </tr>
   `).join('');
+  grid.innerHTML = thead + `<tbody>${tbody}</tbody>`;
 }
 
 ['searchInput', 'filterSelect', 'sortSelect'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderLots);
   document.getElementById(id).addEventListener('change', renderLots);
+});
+
+['boloSearchInput', 'boloKindSelect', 'boloStatusSelect', 'boloSortSelect'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderBolo);
+  document.getElementById(id).addEventListener('change', renderBolo);
 });
 
 function showView(view){

@@ -128,6 +128,25 @@ def fix_numeric_id(s):
     return re.sub(r'\.0$', '', s) if re.match(r'^\d+\.0$', s.strip()) else s
 
 
+_CONTROL_CHARS_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+
+
+def sanitize_text(s, max_len=800):
+    """Defensive cleanup for a free-text form field before it's embedded in
+    a dashboard's JSON blob: strip non-printable control characters (keeps
+    \\n/\\t) a garbled or pasted input could contain, and cap length so one
+    pathological entry can't bloat the page or blow out a layout. HTML/JS
+    safety is handled separately by esc() at render time and
+    embed_json_in_script() at embed time -- this only guards against
+    garbage bytes and unbounded size."""
+    if s is None:
+        return ''
+    s = _CONTROL_CHARS_RE.sub('', str(s)).strip()
+    if len(s) > max_len:
+        s = s[:max_len].rstrip() + '…'
+    return s
+
+
 # ---------------------------------------------------------------------------
 # Photo processing — macOS `sips` locally, ImageMagick/Pillow elsewhere (e.g.
 # a Linux cloud sandbox where `sips` doesn't exist)

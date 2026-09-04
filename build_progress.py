@@ -2,35 +2,41 @@
 """Build the lot checking progress tracker page.
 
 Usage:
-    python3 build_progress.py <intake.xlsx> <fts.html> <xts.html> <output.html>
+    python3 build_progress.py <intake.xlsx> <feedback.xlsx> <fts.html> <xts.html> <output.html>
 
-<intake.xlsx> is an export of the "lot intake" Google Form's response sheet
-(NOT the FTS/XTS test-result sheets). Each response is either a "New lot
-received" row (adds/updates a lot's in-lab status) or a "Request a
-brand/lot to purchase" row (adds to the be-on-the-lookout list) -- see
-BRANCH_INTAKE/BRANCH_BOLO below, which must match the live Form's exact
-radio-button option text.
+<intake.xlsx> is an export of the "lot intake" Google Form's response
+sheet. Each response is either a "New lot received" row (adds/updates a
+lot's in-lab status) or a "Request a brand/lot to purchase" row (adds to
+the be-on-the-lookout list) -- see BRANCH_INTAKE/BRANCH_BOLO below, which
+must match the live Form's exact radio-button option text.
+
+<feedback.xlsx> is an export of the separate "report an interference, or
+suggest a product" Google Form's response sheet -- a second BOLO-list
+source, merged in alongside the intake form's requests. See COL_FEEDBACK
+and parse_feedback_rows() below.
 
 <fts.html> and <xts.html> must already be built (by build_fts.py/
 build_xts.py) -- this script reads their embedded `const DATA = {...}`
 blob via common.extract_dashboard_data() rather than re-parsing the raw
 FTS/XTS sheets a second time, so a lot's testing counts are read once,
-from the one place they're actually computed.
+from the one place they're actually computed. That same merged lot
+registry is also used to answer whether a BOLO entry has actually been
+acquired/tested yet -- see match_registry()/bolo_status().
 
-Network-free, stdlib only, like every other build script here. The
-COL positions below are a DRAFT, written before the live Form exists --
-verify them against the real header row the first time this runs against
-a real export, exactly like every other hardcoded COL map in this repo
-(see build_fts.py's/build_xts.py's own "re-verify against a fresh header
-row" comment).
+Network-free, stdlib only, like every other build script here. Every
+hardcoded COL/COL_FEEDBACK map here should be re-verified against a fresh
+header row if either live Form's question order ever changes, exactly
+like every other hardcoded COL map in this repo (see build_fts.py's/
+build_xts.py's own "re-verify against a fresh header row" comment).
 """
 import os
 import sys
 from collections import defaultdict
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
-    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id,
+    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id, sanitize_text,
     extract_dashboard_data, embed_json_in_script, DASHBOARD_VERSION,
 )
 from completion_rules import STRIP_TYPES
@@ -52,6 +58,19 @@ COL = dict(
     intake_strip_type=4, intake_brand=5, intake_lot=6, intake_expiration=7,
     intake_date_received=8, intake_qty=9, intake_notes=10,
     bolo_product=11, bolo_strip_type=12, bolo_reason=13,
+)
+
+# Column positions for the separate "report an interference, or suggest a
+# product" form's response sheet (id 15wZHFE13Q77jpNlcT_8OOcwOkIridAiVprVV3Hqd6s4,
+# "Lot checking feedback form (Responses)") -- a different sheet from the
+# lot-intake form above. Verified 2026-09-04 against the real header row
+# plus two real test submissions covering both branches. Branch is *not*
+# matched by the "What are you reporting?" text (cols[COL_FEEDBACK['what']]
+# is parsed but only used for a debug print) -- see parse_feedback_rows().
+COL_FEEDBACK = dict(
+    ts=0, email=1, name=2, org=3, what=4,
+    strip_type=5, brand=6, lot=7, suspected=8, why_wrong=9, photo=10, can_send_strip=11,
+    sugg_brand=12, sugg_lot=13, sugg_substance=14, why_test=15, can_send_bulk=16, notes=17,
 )
 
 
@@ -98,19 +117,76 @@ def parse_intake_rows(rows):
                 'expiration': excel_serial_to_dt(r[COL['intake_expiration']]),
                 'date_received': excel_serial_to_dt(r[COL['intake_date_received']]),
                 'qty': qty,
-                'notes': r[COL['intake_notes']].strip() if len(r) > COL['intake_notes'] else '',
+                'notes': sanitize_text(r[COL['intake_notes']]) if len(r) > COL['intake_notes'] else '',
             })
         elif branch == BRANCH_BOLO:
             product = r[COL['bolo_product']].strip()
             if not product:
                 continue
             bolo.append({
-                'dt': dt, 'name': name, 'product': product,
-                'strip_type': r[COL['bolo_strip_type']].strip() if len(r) > COL['bolo_strip_type'] else '',
-                'reason': r[COL['bolo_reason']].strip() if len(r) > COL['bolo_reason'] else '',
+                'dt': dt, 'name': name, 'product': sanitize_text(product, max_len=200),
+                'strip_type': r[COL['bolo_strip_type']].strip().upper() if len(r) > COL['bolo_strip_type'] else '',
+                'reason': sanitize_text(r[COL['bolo_reason']]) if len(r) > COL['bolo_reason'] else '',
             })
         # else: blank/unrecognized branch -- skipped, not guessed at.
     return intake, bolo
+
+
+def _cell(r, idx):
+    return r[idx].strip() if len(r) > idx else ''
+
+
+def parse_feedback_rows(rows):
+    """Split the "report an interference, or suggest a product" form's raw
+    rows into BOLO-shaped dicts. Branch is detected by which column-group
+    is actually populated (cols 5-11 for an interference report, 12-17 for
+    a product suggestion) rather than by matching the "What are you
+    reporting?" option text -- verified 2026-09-04 against two real
+    submissions ("a suspected false negative/false positive/interference"
+    and "a product or lot you'd like tested"), but the column-group
+    occupancy is what's load-bearing so a future Form wording tweak can't
+    silently drop rows the way BRANCH_BOLO's text mismatch nearly did for
+    the intake form."""
+    out = []
+    for r in rows:
+        dt = excel_serial_to_dt(_cell(r, COL_FEEDBACK['ts']))
+        if dt is None:
+            continue
+        name = sanitize_text(_cell(r, COL_FEEDBACK['name']), max_len=200)
+        org = sanitize_text(_cell(r, COL_FEEDBACK['org']), max_len=200)
+
+        strip_type = sanitize_text(_cell(r, COL_FEEDBACK['strip_type']), max_len=40).upper()
+        brand = sanitize_text(_cell(r, COL_FEEDBACK['brand']), max_len=200)
+        lot = fix_numeric_id(sanitize_text(_cell(r, COL_FEEDBACK['lot']), max_len=100))
+        suspected = sanitize_text(_cell(r, COL_FEEDBACK['suspected']))
+        why_wrong = sanitize_text(_cell(r, COL_FEEDBACK['why_wrong']))
+        has_photo = bool(_cell(r, COL_FEEDBACK['photo']))
+        can_send_strip = sanitize_text(_cell(r, COL_FEEDBACK['can_send_strip']), max_len=200)
+
+        sugg_brand = sanitize_text(_cell(r, COL_FEEDBACK['sugg_brand']), max_len=200)
+        sugg_lot = fix_numeric_id(sanitize_text(_cell(r, COL_FEEDBACK['sugg_lot']), max_len=100))
+        sugg_substance = sanitize_text(_cell(r, COL_FEEDBACK['sugg_substance']), max_len=200)
+        why_test = sanitize_text(_cell(r, COL_FEEDBACK['why_test']))
+        can_send_bulk = sanitize_text(_cell(r, COL_FEEDBACK['can_send_bulk']), max_len=200)
+        notes = sanitize_text(_cell(r, COL_FEEDBACK['notes']))
+
+        if strip_type or brand or lot or suspected or why_wrong:
+            out.append({
+                'dt': dt, 'name': name, 'org': org, 'kind': 'interference_report',
+                'strip_type': strip_type, 'brand': brand, 'lot': lot,
+                'suspected': suspected, 'why_wrong': why_wrong,
+                'has_photo': has_photo, 'can_send_strip': can_send_strip,
+            })
+        elif sugg_brand or sugg_lot or sugg_substance or why_test:
+            out.append({
+                'dt': dt, 'name': name, 'org': org, 'kind': 'product_suggestion',
+                'strip_type': '', 'brand': sugg_brand, 'lot': sugg_lot,
+                'marketed_substance': sugg_substance, 'why_test': why_test,
+                'can_send_bulk': can_send_bulk, 'notes': notes,
+            })
+        # else: blank/unrecognized row (neither column-group populated) --
+        # skipped, not guessed at.
+    return out
 
 
 def group_intake_by_lot(intake_events):
@@ -246,16 +322,150 @@ def merge_lots(intake_by_lot, dashboards):
     return out
 
 
+def _parse_iso_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s, '%Y-%m-%d')
+    except (TypeError, ValueError):
+        return None
+
+
+def match_registry(brand, lot, lots):
+    """Look a BOLO entry's brand/lot up against `lots` (merge_lots()'s
+    output -- the same intake+dashboard-merged registry the Lots view
+    itself uses), to answer "has the lab actually acquired this yet, and
+    has it been tested." Returns (matched_lot_dict_or_None, confidence),
+    confidence in {'exact', 'brand_only', None}.
+
+    An exact brand+lot match (normalized via lotkey(), same as
+    merge_lots()) is authoritative. A brand-only match (no lot given, or
+    given lot didn't match anything -- common for `purchase_request` and
+    for `product_suggestion` when "lot number if known" was left blank) is
+    only accepted if it resolves to exactly one distinct lot; 0 or >1
+    candidates means no match rather than a guess."""
+    if brand and lot:
+        key = lotkey(brand, lot)
+        candidates = [l for l in lots if lotkey(l['brand'], l['lot']) == key]
+        confidence = 'exact'
+    elif brand:
+        candidates = [l for l in lots if l['brand'].strip().lower() == brand.strip().lower()]
+        confidence = 'brand_only' if len(candidates) == 1 else None
+        if confidence is None:
+            candidates = []
+    else:
+        candidates, confidence = [], None
+
+    if not candidates:
+        return None, None
+    best = min(candidates, key=lambda l: l['first_received'] or '9999-99-99')
+    return best, confidence
+
+
+def bolo_status(kind, match):
+    """'not_yet_acquired' (a true BOLO -- nothing on hand yet) vs.
+    'received' (on hand, not yet tested) vs. 'tested' (on hand and at
+    least one test result exists), all three read straight off the
+    matched dashboard/intake lot record.
+
+    'in_lab_reported' is the one special case: an interference_report is
+    by construction about a physical strip someone already ran, so
+    'not_yet_acquired' would be actively wrong even when the lot isn't one
+    of our own dashboard entries (e.g. a partner org reporting on strips
+    we've never logged ourselves)."""
+    if match and match.get('n_submissions', 0) > 0:
+        return 'tested'
+    if match and match.get('first_received'):
+        return 'received'
+    if kind == 'interference_report':
+        return 'in_lab_reported'
+    return 'not_yet_acquired'
+
+
+SOURCE_LABEL = {
+    'intake': 'Lot intake form',
+    'feedback': 'Report an interference / suggest a product form',
+}
+KIND_LABEL = {
+    'purchase_request': 'Purchase request',
+    'interference_report': 'Interference report',
+    'product_suggestion': 'Product suggestion',
+}
+
+
+def build_bolo_entries(intake_bolo, feedback_rows, lots):
+    """Unify BOLO-list entries from both sources into one flat, sortable
+    list, each tagged with where it came from (source/kind) and whether
+    the lab has actually acquired/tested the item yet (status, plus
+    latency in days -- see match_registry()/bolo_status() above)."""
+    raw = []
+    for b in intake_bolo:
+        raw.append({
+            'dt': b['dt'], 'source': 'intake', 'kind': 'purchase_request',
+            'name': b['name'], 'org': '',
+            'strip_type': b['strip_type'], 'brand': b['product'], 'lot': '',
+            'reason': b['reason'],
+            'suspected': '', 'why_wrong': '', 'has_photo': False, 'can_send_strip': '',
+            'marketed_substance': '', 'why_test': '', 'can_send_bulk': '', 'notes': '',
+        })
+    for f in feedback_rows:
+        raw.append({
+            'dt': f['dt'], 'source': 'feedback', 'kind': f['kind'],
+            'name': f['name'], 'org': f['org'],
+            'strip_type': f.get('strip_type', ''), 'brand': f['brand'], 'lot': f['lot'],
+            'reason': '',
+            'suspected': f.get('suspected', ''), 'why_wrong': f.get('why_wrong', ''),
+            'has_photo': f.get('has_photo', False), 'can_send_strip': f.get('can_send_strip', ''),
+            'marketed_substance': f.get('marketed_substance', ''), 'why_test': f.get('why_test', ''),
+            'can_send_bulk': f.get('can_send_bulk', ''), 'notes': f.get('notes', ''),
+        })
+
+    out = []
+    for e in raw:
+        match, confidence = match_registry(e['brand'], e['lot'], lots)
+        status = bolo_status(e['kind'], match)
+        acquired = _parse_iso_date(match['first_received']) if match else None
+        tested = _parse_iso_date(match['first_submitted']) if (match and match.get('n_submissions', 0) > 0) else None
+
+        days_to_acquire = (acquired - e['dt']).days if acquired else None
+        days_to_test = (tested - acquired).days if (tested and acquired) else None
+        days_report_to_test = (tested - e['dt']).days if tested else None
+
+        out.append({
+            'dt_display': e['dt'].strftime('%-m/%-d/%Y'), 'dt_sort': e['dt'].strftime('%Y-%m-%dT%H:%M'),
+            'source': e['source'], 'source_label': SOURCE_LABEL[e['source']],
+            'kind': e['kind'], 'kind_label': KIND_LABEL[e['kind']],
+            'submitter': e['name'], 'org': e['org'],
+            'strip_type': e['strip_type'], 'brand': e['brand'], 'lot': e['lot'],
+            'reason': e['reason'],
+            'suspected': e['suspected'], 'why_wrong': e['why_wrong'],
+            'has_photo': e['has_photo'], 'can_send_strip': e['can_send_strip'],
+            'marketed_substance': e['marketed_substance'], 'why_test': e['why_test'],
+            'can_send_bulk': e['can_send_bulk'], 'notes': e['notes'],
+            'status': status, 'match_confidence': confidence,
+            'acquired_date': acquired.strftime('%Y-%m-%d') if acquired else None,
+            'first_tested_date': tested.strftime('%Y-%m-%d') if tested else None,
+            'days_to_acquire': days_to_acquire, 'days_to_test': days_to_test,
+            'days_report_to_test': days_report_to_test,
+        })
+    out.sort(key=lambda e: e['dt_sort'], reverse=True)
+    return out
+
+
 def main():
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         print(__doc__)
         sys.exit(1)
-    intake_xlsx, fts_path, xts_path, out_path = sys.argv[1:5]
+    intake_xlsx, feedback_xlsx, fts_path, xts_path, out_path = sys.argv[1:6]
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', 'progress_template.html')
 
     header, rows = parse_xlsx_sheet(intake_xlsx)
     intake_events, bolo_requests = parse_intake_rows(rows)
     print(f'parsed {len(intake_events)} intake event(s), {len(bolo_requests)} BOLO request(s)')
+
+    fb_header, fb_rows = parse_xlsx_sheet(feedback_xlsx)
+    feedback_rows = parse_feedback_rows(fb_rows)
+    print(f'parsed {len(feedback_rows)} feedback-form row(s)')
 
     intake_by_lot = group_intake_by_lot(intake_events)
 
@@ -263,11 +473,7 @@ def main():
     xts_data = extract_dashboard_data(xts_path)
     lots = merge_lots(intake_by_lot, {'FTS': fts_data['lots'], 'XTS': xts_data['lots']})
 
-    bolo_requests.sort(key=lambda b: b['dt'], reverse=True)
-    bolo_out = [{
-        'timestamp': b['dt'].strftime('%-m/%-d/%Y'), 'requester': b['name'],
-        'product': b['product'], 'strip_type': b['strip_type'], 'reason': b['reason'],
-    } for b in bolo_requests]
+    bolo_out = build_bolo_entries(bolo_requests, feedback_rows, lots)
 
     n_complete = sum(1 for l in lots if l['complete'] is True)
     n_incomplete = sum(1 for l in lots if l['complete'] is False)
