@@ -123,9 +123,13 @@ def parse_xlsx_sheet(xlsx_path, sheet_file='xl/worksheets/sheet1.xml'):
 
 
 def fix_numeric_id(s):
-    """Sheets sometimes stores a lot number as a plain number (e.g. 2404191.0).
-    Strip the trailing .0 so it displays like the text everyone actually typed."""
-    return re.sub(r'\.0$', '', s) if re.match(r'^\d+\.0$', s.strip()) else s
+    """Sheets sometimes stores a lot number as a plain number (e.g. 2404191.0
+    or, for a free-text "lot number" field on the feedback form, -2.0).
+    Strip the trailing .0 so it displays like the text everyone actually
+    typed -- the leading `-?` matters: a lot value of "-2" round-trips
+    through Sheets' numeric storage as "-2.0", and the un-hyphenated regex
+    only matched a plain digit string, silently leaving the .0 in place."""
+    return re.sub(r'\.0$', '', s) if re.match(r'^-?\d+\.0$', s.strip()) else s
 
 
 _CONTROL_CHARS_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
