@@ -383,8 +383,8 @@ def bolo_status(kind, match):
 
 
 SOURCE_LABEL = {
-    'intake': 'Lot intake form',
-    'feedback': 'Report an interference / suggest a product form',
+    'intake': 'Intake form',
+    'feedback': 'Feedback form',
 }
 KIND_LABEL = {
     'purchase_request': 'Purchase request',

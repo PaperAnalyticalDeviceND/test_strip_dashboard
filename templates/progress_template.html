@@ -40,9 +40,10 @@
   .sub{color:var(--ink-2);font-size:15px;margin:0 0 24px;max-width:70ch;}
 
   .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;box-shadow:var(--shadow);}
-  .stat{background:var(--surface);padding:14px 16px;}
+  .stat{background:var(--surface);padding:14px 16px;border:none;font-family:inherit;text-align:left;cursor:pointer;display:block;width:100%;}
+  .stat:hover{background:var(--surface-2);}
   .stat .label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:4px;}
-  .stat .value{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;}
+  .stat .value{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;color:var(--ink);}
 
   .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:18px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
   .views{display:flex;gap:4px;}
@@ -86,6 +87,8 @@
   table.lot-table a.dash-link:hover{text-decoration:underline;}
 
   .bolo-summary{font-size:12.5px;color:var(--ink-2);margin-bottom:12px;}
+  #boloGrid td{line-height:1.3;}
+  .bolo-sub{color:var(--ink-3);font-size:11.5px;margin-top:2px;line-height:1.3;}
 
   .empty-state{padding:40px;text-align:center;color:var(--ink-3);font-size:13px;}
   footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-3);line-height:1.7;}
@@ -178,10 +181,10 @@ const ESC_MAP = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ESC_MAP[c]); }
 
 document.getElementById('statRow').innerHTML = `
-  <div class="stat"><div class="label">Lots tracked</div><div class="value">${DATA.overall.n_lots}</div></div>
-  <div class="stat"><div class="label">Complete</div><div class="value">${DATA.overall.n_complete}</div></div>
-  <div class="stat"><div class="label">Incomplete</div><div class="value">${DATA.overall.n_incomplete}</div></div>
-  <div class="stat"><div class="label">Be on the lookout</div><div class="value">${DATA.overall.n_bolo}</div></div>
+  <button type="button" class="stat" data-stat="all"><div class="label">Lots tracked</div><div class="value">${DATA.overall.n_lots}</div></button>
+  <button type="button" class="stat" data-stat="complete"><div class="label">Complete</div><div class="value">${DATA.overall.n_complete}</div></button>
+  <button type="button" class="stat" data-stat="incomplete"><div class="label">Incomplete</div><div class="value">${DATA.overall.n_incomplete}</div></button>
+  <button type="button" class="stat" data-stat="bolo"><div class="label">Be on the lookout</div><div class="value">${DATA.overall.n_bolo}</div></button>
 `;
 
 function lotStatusKey(l){
@@ -328,27 +331,44 @@ function boloSearchText(b){
           b.marketed_substance, b.why_test, b.notes].join(' ').toLowerCase();
 }
 
-function boloDetail(b){
+// The single free-text field that best answers "what's the actual problem
+// or suggestion" for this entry's kind -- shown as the primary line so it
+// doesn't get buried under secondary metadata (can-send-strip, marketed
+// substance, etc.), which is what made rows tall.
+function boloPrimaryText(b){
+  if (b.kind === 'purchase_request') return b.reason;
+  if (b.kind === 'interference_report') return b.why_wrong || b.suspected;
+  if (b.kind === 'product_suggestion') return b.why_test || b.notes;
+  return '';
+}
+
+function boloSecondaryText(b){
   const bits = [];
-  if (b.kind === 'purchase_request' && b.reason) bits.push(esc(b.reason));
   if (b.kind === 'interference_report') {
-    if (b.suspected) bits.push(`Suspected: ${esc(b.suspected)}`);
-    if (b.why_wrong) bits.push(`Why: ${esc(b.why_wrong)}`);
+    if (b.suspected && b.why_wrong) bits.push(`Suspected: ${esc(b.suspected)}`);
     if (b.can_send_strip) bits.push(`Can send strip: ${esc(b.can_send_strip)}`);
     if (b.has_photo) bits.push('Photo attached');
   }
   if (b.kind === 'product_suggestion') {
     if (b.marketed_substance) bits.push(`Marketed for: ${esc(b.marketed_substance)}`);
-    if (b.why_test) bits.push(`Why test: ${esc(b.why_test)}`);
     if (b.can_send_bulk) bits.push(`Can send 50-100: ${esc(b.can_send_bulk)}`);
-    if (b.notes) bits.push(esc(b.notes));
+    if (b.notes && b.why_test) bits.push(esc(b.notes));
   }
+  return bits.join(' &middot; ');
+}
+
+function boloDetail(b){
+  const primary = boloPrimaryText(b);
+  const secondary = boloSecondaryText(b);
   let latency = '';
   if (b.days_to_acquire !== null) latency += `Acquired in ${b.days_to_acquire}d`;
   if (b.days_to_test !== null) latency += (latency ? ' &middot; ' : '') + `tested ${b.days_to_test}d later`;
   else if (b.days_report_to_test !== null) latency += (latency ? ' &middot; ' : '') + `tested ${b.days_report_to_test}d after report`;
-  const detailHtml = bits.join('<br>');
-  return detailHtml + (latency ? `<div style="color:var(--ink-3);font-size:11.5px;margin-top:4px;">${latency}</div>` : '');
+
+  let html = primary ? esc(primary) : '<span style="color:var(--ink-3);">&mdash;</span>';
+  if (secondary) html += `<div class="bolo-sub">${secondary}</div>`;
+  if (latency) html += `<div class="bolo-sub">${latency}</div>`;
+  return html;
 }
 
 function sortBolo(list, mode){
@@ -397,21 +417,21 @@ function renderBolo(){
   }
   const thead = `
     <thead><tr>
-      <th>Date</th><th>How it arrived</th><th>Type</th><th>Status</th>
-      <th>Strip type</th><th>Brand / product</th><th>Lot</th><th>Submitted by</th><th>Details</th>
+      <th>Date</th><th>Status</th><th>Type</th><th>Problem / suggestion</th>
+      <th>Strip type</th><th>Brand / product</th><th>Lot</th><th>Submitted by</th><th>How it arrived</th>
     </tr></thead>
   `;
   const tbody = list.map(b => `
     <tr>
       <td class="mono">${esc(b.dt_display)}</td>
-      <td>${esc(b.source_label)}</td>
-      <td>${esc(b.kind_label)}</td>
       <td><span class="status-badge ${esc(b.status)}">${esc(BOLO_STATUS_LABEL[b.status] || b.status)}</span></td>
+      <td>${esc(b.kind_label)}</td>
+      <td>${boloDetail(b)}</td>
       <td>${b.strip_type ? esc(b.strip_type) : '&mdash;'}</td>
       <td class="brand">${b.brand ? esc(b.brand) : '&mdash;'}</td>
       <td class="lotnum mono">${b.lot ? esc(b.lot) : '&mdash;'}</td>
-      <td>${esc(b.submitter)}${b.org ? `<br><span style="color:var(--ink-3);font-size:11.5px;">${esc(b.org)}</span>` : ''}</td>
-      <td>${boloDetail(b)}</td>
+      <td>${esc(b.submitter)}${b.org ? `<div class="bolo-sub">${esc(b.org)}</div>` : ''}</td>
+      <td>${esc(b.source_label)}</td>
     </tr>
   `).join('');
   grid.innerHTML = thead + `<tbody>${tbody}</tbody>`;
@@ -442,6 +462,22 @@ document.querySelectorAll('#viewSwitch button').forEach(btn => {
     } else {
       currentView = 'lots';
       currentStripType = btn.dataset.type;
+    }
+    updateTabButtons();
+    showView(currentView);
+    if (currentView === 'lots') renderLots();
+  });
+});
+
+document.querySelectorAll('#statRow .stat').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const stat = btn.dataset.stat;
+    if (stat === 'bolo') {
+      currentView = 'bolo';
+    } else {
+      currentView = 'lots';
+      if (!currentStripType) currentStripType = typesPresent[0];
+      document.getElementById('filterSelect').value = stat === 'all' ? '' : stat;
     }
     updateTabButtons();
     showView(currentView);
