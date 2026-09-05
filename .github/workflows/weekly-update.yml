@@ -113,7 +113,7 @@ jobs:
 
       - name: Build hub (live stats pulled from the dashboards above)
         run: |
-          python3 build_hub.py _build/fts.html _build/xts.html _build/progress.html templates/hub_template.html _build/index.html
+          python3 build_hub.py _build/fts.html _build/xts.html _build/progress.html templates/hub_template.html _build/index.html templates/methodology_template.html _build/methodology.html
 
       - name: Wipe secret file before publish
         if: always()
@@ -134,6 +134,7 @@ jobs:
           git add xts.html || true
           git add progress.html || true
           git add index.html || true
+          git add methodology.html || true
           if git diff --cached --quiet; then
             echo "no changes to publish"
           else
