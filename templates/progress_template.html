@@ -88,6 +88,8 @@
 
   .bolo-summary{font-size:12.5px;color:var(--ink-2);margin-bottom:12px;}
   #boloGrid td{line-height:1.3;}
+  #boloGrid th:nth-child(2), #boloGrid td:nth-child(2){width:100px;}
+  #boloGrid th:nth-child(4), #boloGrid td:nth-child(4){width:340px;}
   .bolo-sub{color:var(--ink-3);font-size:11.5px;margin-top:2px;line-height:1.3;}
 
   .empty-state{padding:40px;text-align:center;color:var(--ink-3);font-size:13px;}
@@ -154,7 +156,7 @@
         <option value="not_yet_acquired">Not yet acquired</option>
         <option value="received">Received</option>
         <option value="tested">Tested</option>
-        <option value="in_lab_reported">Reported (not in our dashboards)</option>
+        <option value="in_lab_reported">Reported only (not in our dashboards)</option>
       </select>
       <select id="boloSortSelect">
         <option value="newest">Sort: newest first</option>
@@ -323,7 +325,10 @@ function renderLots(){
 
 const BOLO_STATUS_LABEL = {
   not_yet_acquired: 'Not yet acquired', received: 'Received', tested: 'Tested',
-  in_lab_reported: 'Reported (not in our dashboards)',
+  in_lab_reported: 'Reported only',
+};
+const BOLO_STATUS_TITLE = {
+  in_lab_reported: 'An interference report about a strip someone already ran, but its brand/lot text didn’t match anything in our own FTS/XTS records',
 };
 
 function boloSearchText(b){
@@ -424,7 +429,7 @@ function renderBolo(){
   const tbody = list.map(b => `
     <tr>
       <td class="mono">${esc(b.dt_display)}</td>
-      <td><span class="status-badge ${esc(b.status)}">${esc(BOLO_STATUS_LABEL[b.status] || b.status)}</span></td>
+      <td><span class="status-badge ${esc(b.status)}" title="${esc(BOLO_STATUS_TITLE[b.status] || '')}">${esc(BOLO_STATUS_LABEL[b.status] || b.status)}</span></td>
       <td>${esc(b.kind_label)}</td>
       <td>${boloDetail(b)}</td>
       <td>${b.strip_type ? esc(b.strip_type) : '&mdash;'}</td>

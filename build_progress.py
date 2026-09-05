@@ -331,6 +331,10 @@ def _parse_iso_date(s):
         return None
 
 
+def _lot_norm(lot):
+    return fix_numeric_id(lot.strip()).upper().replace(' ', '')
+
+
 def match_registry(brand, lot, lots):
     """Look a BOLO entry's brand/lot up against `lots` (merge_lots()'s
     output -- the same intake+dashboard-merged registry the Lots view
@@ -338,16 +342,31 @@ def match_registry(brand, lot, lots):
     has it been tested." Returns (matched_lot_dict_or_None, confidence),
     confidence in {'exact', 'brand_only', None}.
 
-    An exact brand+lot match (normalized via lotkey(), same as
-    merge_lots()) is authoritative. A brand-only match (no lot given, or
-    given lot didn't match anything -- common for `purchase_request` and
-    for `product_suggestion` when "lot number if known" was left blank) is
-    only accepted if it resolves to exactly one distinct lot; 0 or >1
-    candidates means no match rather than a guess."""
-    if brand and lot:
-        key = lotkey(brand, lot)
-        candidates = [l for l in lots if lotkey(l['brand'], l['lot']) == key]
-        confidence = 'exact'
+    Matches by lot number alone when a lot is given, not brand+lot --
+    caught live 2026-09-05: a real interference report gave the brand as
+    "Advion 200 ng/mL" (free text, this form has no brand dropdown) for a
+    lot the FTS dashboard has on file as "Advin Biotech", same lot number
+    (FYL2404003-S). Brand text drifts across forms/submitters in exactly
+    this way; the lot number printed on the foil pouch is this project's
+    actual unique identifier (see the hub page's own brand/lot
+    terminology note), so it's the right sole key once one is given. If
+    more than one distinct lot shares that lot number (different brands,
+    rare but not impossible), narrow by brand as a tie-breaker; if that
+    still doesn't resolve to exactly one, there's no confident match.
+    A brand-only match (no lot given at all -- common for
+    `purchase_request` and for `product_suggestion` when "lot number if
+    known" was left blank) is only accepted if it resolves to exactly one
+    distinct lot; 0 or >1 candidates means no match rather than a guess."""
+    if lot:
+        target = _lot_norm(lot)
+        candidates = [l for l in lots if _lot_norm(l['lot']) == target]
+        if len(candidates) > 1 and brand:
+            narrowed = [l for l in candidates if l['brand'].strip().lower() == brand.strip().lower()]
+            if len(narrowed) == 1:
+                candidates = narrowed
+        confidence = 'exact' if len(candidates) == 1 else None
+        if confidence is None:
+            candidates = []
     elif brand:
         candidates = [l for l in lots if l['brand'].strip().lower() == brand.strip().lower()]
         confidence = 'brand_only' if len(candidates) == 1 else None
