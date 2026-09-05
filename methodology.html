@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methodology &amp; Limitations — Lieberman Lab Test Strip Lot Checking</title>
+<style>
+  :root{
+    --bg:#f2f5f3;
+    --surface:#ffffff;
+    --surface-2:#e8ede9;
+    --surface-3:#dde4de;
+    --ink:#131c18;
+    --ink-2:#44544c;
+    --ink-3:#76867d;
+    --border:#d3dbd4;
+    --border-strong:#b9c4bb;
+    --accent:#0d6e63;
+    --accent-ink:#ffffff;
+    --accent-tint:#e2f0ec;
+    --accent-tint-border:#bcdcd3;
+    --warn:#a2650f;
+    --warn-tint:#faf0dd;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#101512;
+      --surface:#161d19;
+      --surface-2:#1d2521;
+      --surface-3:#26302a;
+      --ink:#e9efe9;
+      --ink-2:#aebbb2;
+      --ink-3:#7c8b82;
+      --border:#2a352e;
+      --border-strong:#3a473e;
+      --accent:#4fbfa8;
+      --accent-ink:#04211c;
+      --accent-tint:#172b27;
+      --accent-tint-border:#25423b;
+      --warn:#d8a45e;
+      --warn-tint:#2d2418;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);line-height:1.55;}
+  body{max-width:940px;margin:0 auto;padding:28px 24px 96px;}
+  .hub-link{font-family:var(--font-mono);font-size:12px;color:var(--ink-3);text-decoration:none;}
+  .hub-link:hover{color:var(--accent);}
+  header.masthead{
+    display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+    font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);
+    text-transform:uppercase;letter-spacing:.05em;margin:18px 0 10px;
+  }
+  header.masthead .sep{color:var(--border-strong);}
+  h1{font-size:1.9rem;line-height:1.15;margin:4px 0 22px;color:var(--ink);}
+  h2{font-size:1.15rem;color:var(--ink);margin:0 0 14px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  h3{font-size:1.02rem;color:var(--ink);margin:0 0 8px;}
+  p{margin:0 0 12px;color:var(--ink-2);}
+  section{margin-top:38px;}
+  section:first-of-type{margin-top:0;}
+  .method p{max-width:76ch;}
+  .method p:last-child{margin-bottom:0;}
+  .method h3{color:var(--ink);font-size:.95rem;text-transform:uppercase;letter-spacing:.04em;margin:22px 0 8px;}
+  .method h3:first-child{margin-top:0;}
+  .method ul{margin:0 0 14px;padding-left:1.2em;max-width:76ch;}
+  .method li{margin-bottom:6px;color:var(--ink-2);}
+
+  footer.about{
+    margin-top:56px;padding-top:16px;border-top:1px solid var(--border);
+    font-size:.85rem;color:var(--ink-3);
+  }
+  footer.about a{color:var(--ink-3);}
+  footer.about code{background:var(--surface-2);padding:1px 5px;border-radius:3px;font-size:.85em;}
+</style>
+<script data-goatcounter="https://liebermandashboards.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+
+<a class="hub-link" href="./">&larr; Test Strip Lot Checking Program</a>
+
+<header class="masthead">
+  <span>Lieberman Lab</span><span class="sep">·</span>
+  <span>Notre Dame Chemistry &amp; Biochemistry</span>
+</header>
+
+<h1>Methodology &amp; limitations</h1>
+
+<section class="method">
+  <h3>Why we test</h3>
+  <p>
+    Drug test strips that are marketed for use in drug checking are
+    currently not regulated by FDA or Canada Health Services, so we have
+    started a lot checking project to make sure that these products are
+    fit for this application.
+  </p>
+
+  <h3>What we test</h3>
+  <ul>
+    <li>Can the strip actually detect its target at a realistic
+      concentration? (In the case of benzo and nitazene strips, we test
+      several common target structures.)</li>
+    <li>Does a true negative sample like water sometimes cause false
+      positives?</li>
+    <li>Do other substances that might be present in a drug checking
+      sample cause false positives on the strip?</li>
+  </ul>
+
+  <h3>A note on terms</h3>
+  <p>
+    Each dashboard is organized around three levels: <strong>manufacturer</strong>
+    (the company that actually makes the physical strip, which is not
+    always disclosed and can change over time even for a familiar brand),
+    <strong>brand</strong> (the name printed on the box, which is how the
+    strip is sold and marketed), and <strong>lot</strong> (sometimes
+    called a batch: one specific production run, identified by a lot or
+    batch number printed on the packaging).
+  </p>
+  <p>
+    One manufacturer can sell strips under several different brand names,
+    and one brand accumulates many different lots over time as new
+    batches are produced. That is why a single brand can show up as many
+    separate entries on a dashboard: each row is a lot, not a brand, and
+    lot-to-lot quality can vary even within the same brand. Testing at
+    the lot level, not just the brand level, is the whole point of this
+    project.
+  </p>
+</section>
+
+<section class="method">
+  <h2>Limitations</h2>
+  <ul>
+    <li>We are not measuring the limit of detection (LOD) &mdash; we are
+      just checking the strips at concentrations that we think are good
+      threshold levels.</li>
+    <li>We are only testing a small number (1&ndash;6) of structural
+      variants of the target. For benzos and nitazenes, there are dozens
+      of structural variants that could be present in a sample.</li>
+    <li>Results may be listed as positive (no visible test line) vs
+      negative (any visible test line, even if it is very faint), or we
+      may score line visibility on a 1&ndash;10 intensity scale instead,
+      where line intensities of 1&ndash;3 are very faint lines that many
+      people will report as positive results. More information is
+      provided in the methodology notes on the dashboards.</li>
+    <li>We are only testing a small number of interferences at
+      concentrations up to 2&nbsp;mg/mL.</li>
+  </ul>
+  <p>
+    In practice this means if the strip says it's there, it's probably
+    there &mdash; but if the strip can't detect the target, there could
+    still be a small amount of the target or a different structural
+    variation. If you prepare samples using a standard 2&nbsp;mg/mL
+    nominal concentration (e.g., 10&nbsp;mg scoop + 5&nbsp;mL water) these
+    results should be reliable.
+  </p>
+</section>
+
+<footer class="about">
+  <p>
+    Repo (private): <a href="https://github.com/PaperAnalyticalDeviceND/test_strip_dashboard">github.com/PaperAnalyticalDeviceND/test_strip_dashboard</a>
+    · Built by GitHub Actions weekly from the Google-Form response data;
+    served via GitHub Pages from the <code>gh-pages</code> branch.
+  </p>
+  <p>Dashboard v1.2 &middot; updated September 5, 2026</p>
+</footer>
+
+</body>
+</html>
