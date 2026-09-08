@@ -1131,6 +1131,21 @@ document.getElementById('sortSelect').addEventListener('change', () => { matrixS
 
 renderStats();
 renderCurrentView();
+
+// Deep link support: templates/progress_template.html links here as
+// "fts.html#lot=<encodeURIComponent(brand+'||'+lot)>" so clicking a lot on
+// the progress tracker opens straight into that lot's drawer, instead of
+// just landing on the dashboard's default view. `key` uses the exact same
+// unnormalized brand+'||'+lot join as every other data-key in this file
+// (see openDrawer() above), so no extra matching logic is needed here --
+// if the key isn't found (e.g. the progress tracker's own intake-only
+// lots, which have no dashboard entry), this is a silent no-op.
+(function openDrawerFromHash(){
+  const m = location.hash.match(/^#lot=(.+)$/);
+  if (!m) return;
+  const key = decodeURIComponent(m[1]);
+  if (lots.some(x => (x.brand + '||' + x.lot) === key)) openDrawer(key);
+})();
 </script>
 </body>
 </html>
