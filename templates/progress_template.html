@@ -76,6 +76,7 @@
   table.lot-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top;}
   table.lot-table tbody tr:last-child td{border-bottom:none;}
   table.lot-table tbody tr:hover{background:var(--surface-2);}
+  table.lot-table tbody tr.clickable-row{cursor:pointer;}
   table.lot-table td.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap;}
   table.lot-table .brand{font-weight:600;}
   table.lot-table .lotnum{font-family:var(--font-mono);font-size:12px;color:var(--ink-2);}
@@ -83,6 +84,13 @@
   .metric.ok{color:var(--good);}
   .metric.warn{color:var(--warn);}
   .metric-row{display:flex;flex-direction:column;gap:2px;}
+  .int-dots{display:flex;gap:3px;margin-top:4px;}
+  .int-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .int-dot.untested{background:var(--surface-3);border:1px solid var(--border-strong);}
+  .int-dot.clean{background:var(--good);}
+  .int-dot.characterized{background:var(--accent);}
+  .int-dot.flagged{background:var(--warn);}
+  .expired-tag{color:var(--crit);font-size:11px;font-weight:600;margin-left:4px;}
   table.lot-table a.dash-link{color:var(--accent);text-decoration:none;font-family:var(--font-mono);font-size:11.5px;white-space:nowrap;}
   table.lot-table a.dash-link:hover{text-decoration:underline;}
 
@@ -124,6 +132,13 @@
       <option value="incomplete">Incomplete</option>
       <option value="untested">Not yet tested</option>
       <option value="unsupported">Not yet supported strip type</option>
+    </select>
+    <select id="expirationFilterSelect">
+      <option value="">Any expiration</option>
+      <option value="expired">Expired</option>
+      <option value="30">Expiring within 30 days</option>
+      <option value="90">Expiring within 90 days</option>
+      <option value="none">No expiration logged</option>
     </select>
     <select id="sortSelect">
       <option value="incomplete_first">Sort: incomplete first</option>
@@ -169,7 +184,7 @@
   </section>
 
   <footer>
-    <strong>Method.</strong> "Complete" means testing coverage, not that the lot passed &mdash; a lot with a confirmed, fully-characterized interference still counts as complete. A lot is "complete" when every listed target has &ge;25 recorded detection runs, the true-negative-with-water check has &ge;5 runs, every listed interference substance has been run at 2&nbsp;mg/mL (and, if positive there, also run at 0.7 or 0.2&nbsp;mg/mL), and at least one packaging photo and one strip photo are on file. Run counts and photo counts are read directly from the FTS/XTS dashboards' own computed data, not re-derived from the raw sheets. "In lab" status and received-date come from the lot intake form; a lot with real test submissions but no logged intake row still appears here (most lots will look like this until students log them retroactively). Strip types without a completion checklist yet (no build script exists) show as "not yet supported" rather than complete or incomplete.
+    <strong>Method.</strong> "Complete" means testing coverage, not that the lot passed &mdash; a lot with a confirmed, fully-characterized interference still counts as complete. A lot is "complete" when every listed target has &ge;25 recorded detection runs, the true-negative-with-water check has &ge;5 runs, every listed interference substance has been run at 2&nbsp;mg/mL (and, if positive there, also run at 0.7 or 0.2&nbsp;mg/mL), and at least one packaging photo and one strip photo are on file. Run counts and photo counts are read directly from the FTS/XTS dashboards' own computed data, not re-derived from the raw sheets. "In lab" status and received-date come from the lot intake form; a lot with real test submissions but no logged intake row still appears here (most lots will look like this until students log them retroactively). Strip types without a completion checklist yet (no build script exists) show as "not yet supported" rather than complete or incomplete. The dots under the Interferences count show each substance's own status &mdash; grey: not tested yet, green: clean at 2&nbsp;mg/mL, teal: positive but already characterized at a lower concentration, amber: positive and still needs a lower-concentration follow-up (hover a dot for the substance name). Clicking a lot's row opens that lot's own results directly on the FTS/XTS dashboard, when it has any.
     <br><br>
     <strong>Be on the lookout.</strong> Entries come from two forms: a purchase request logged on the lot intake form, or an interference report / product suggestion logged on the "report an interference, or suggest a product" form. Status is matched against the same intake/dashboard records the Lots view uses: "not yet acquired" means nothing on file for that brand/lot yet; "received" means it's been logged as intake but not yet tested; "tested" means at least one real test submission exists. An interference report is about a strip someone already ran, so one that doesn't match our own records shows as "reported (not in our dashboards)" rather than "not yet acquired." Latency (days to acquire, days to first test) is computed from these same matched dates and only shown when known.
     <br><span id="versionNote"></span>
@@ -259,15 +274,40 @@ function tnCell(l){
   return `<span class="metric ${tn.complete ? 'ok' : 'warn'}">${tn.run}/${tn.min_run}</span>`;
 }
 
+// One dot per interference substance so "tested and clean" vs "never run"
+// vs "positive, still needs a follow-up" vs "positive, already
+// characterized" are each visually distinct at a glance, not collapsed
+// into one fraction -- hovering a dot names the substance and its exact
+// status (native title tooltip, no extra JS needed).
 function interferenceCell(l){
   if (l.complete === null) return '<span class="metric">&mdash;</span>';
   const c = l.completion;
   const nOk = c.interferences.filter(i => i.complete).length;
-  const needsFollowUp = c.interferences.filter(i => i.needs_follow_up && !i.has_follow_up);
-  const title = needsFollowUp.length
-    ? `Needs a lower-concentration follow-up run: ${needsFollowUp.map(i => i.substance).join(', ')}`
-    : '';
-  return `<span class="metric ${c.interferences_complete ? 'ok' : 'warn'}" title="${esc(title)}">${nOk}/${c.interferences.length}</span>`;
+  const dots = c.interferences.map(i => {
+    let cls, label;
+    if (i.hi_run === 0) { cls = 'untested'; label = `${i.substance}: not tested yet`; }
+    else if (i.hi_hits === 0) { cls = 'clean'; label = `${i.substance}: clean at 2 mg/mL (${i.hi_run} runs)`; }
+    else if (i.has_follow_up) { cls = 'characterized'; label = `${i.substance}: positive at 2 mg/mL, characterized at a lower concentration`; }
+    else { cls = 'flagged'; label = `${i.substance}: positive at 2 mg/mL, needs a lower-concentration follow-up`; }
+    return `<span class="int-dot ${cls}" title="${esc(label)}"></span>`;
+  }).join('');
+  return `<div class="metric-row"><span class="metric ${c.interferences_complete ? 'ok' : 'warn'}">${nOk}/${c.interferences.length}</span><div class="int-dots">${dots}</div></div>`;
+}
+
+function expirationFilterMatch(l, mode){
+  if (!mode) return true;
+  if (mode === 'none') return !l.expiration;
+  if (!l.expiration) return false;
+  const days = Math.floor((new Date(l.expiration + 'T00:00:00') - new Date()) / 86400000);
+  if (mode === 'expired') return days < 0;
+  if (mode === '30') return days >= 0 && days <= 30;
+  if (mode === '90') return days >= 0 && days <= 90;
+  return true;
+}
+
+function lotDashboardUrl(l){
+  if (!l.dashboard_href) return null;
+  return `${l.dashboard_href}#lot=${encodeURIComponent(l.brand + '||' + l.lot)}`;
 }
 
 function photosCell(l){
@@ -279,35 +319,43 @@ function photosCell(l){
 function renderLots(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const filter = document.getElementById('filterSelect').value;
+  const expFilter = document.getElementById('expirationFilterSelect').value;
   const sortMode = document.getElementById('sortSelect').value;
 
   const typeLots = DATA.lots.filter(l => l.strip_type === currentStripType);
   let list = typeLots.filter(l => !q || lotSearchText(l).includes(q));
   if (filter) list = list.filter(l => lotStatusKey(l) === filter);
+  if (expFilter) list = list.filter(l => expirationFilterMatch(l, expFilter));
   list = sortLots(list, sortMode);
 
   document.getElementById('resultCount').textContent = `${list.length} of ${typeLots.length} ${esc(currentStripType)} lots`;
 
   const table = document.getElementById('lotGrid');
   if (!list.length) {
-    table.innerHTML = `<tbody><tr><td class="empty-state" colspan="9">No lots match this search/filter.</td></tr></tbody>`;
+    table.innerHTML = `<tbody><tr><td class="empty-state" colspan="10">No lots match this search/filter.</td></tr></tbody>`;
     return;
   }
   const thead = `
     <thead><tr>
       <th>Brand</th><th>Lot</th><th>Status</th><th>Target(s)</th><th>True negative</th>
-      <th>Interferences</th><th>Photos</th><th>Received</th><th></th>
+      <th>Interferences</th><th>Photos</th><th>Received</th><th>Expiration</th><th></th>
     </tr></thead>
   `;
   const tbody = list.map(l => {
     const statusKey = lotStatusKey(l);
     const received = l.first_received ? esc(l.first_received) : 'not logged';
     const qty = l.total_qty ? ` (${l.total_qty})` : '';
-    const dashLink = l.dashboard_href
-      ? `<a class="dash-link" href="${esc(l.dashboard_href)}" target="_blank" rel="noopener">${esc(l.strip_type)} dashboard &rarr;</a>`
+    const isExpired = l.expiration && (new Date(l.expiration + 'T00:00:00') < new Date());
+    const expiration = l.expiration
+      ? `${esc(l.expiration)}${isExpired ? '<span class="expired-tag">EXPIRED</span>' : ''}`
+      : 'not logged';
+    const dashUrl = lotDashboardUrl(l);
+    const dashLink = dashUrl
+      ? `<a class="dash-link" href="${esc(dashUrl)}" target="_blank" rel="noopener">${esc(l.strip_type)} dashboard &rarr;</a>`
       : '';
+    const rowAttrs = dashUrl ? ` class="clickable-row" data-dash-url="${esc(dashUrl)}" title="Open this lot's results"` : '';
     return `
-      <tr>
+      <tr${rowAttrs}>
         <td class="brand">${esc(l.brand)}</td>
         <td class="lotnum mono">${esc(l.lot)}</td>
         <td><span class="status-badge ${statusKey}">${lotStatusLabel(statusKey)}</span></td>
@@ -316,11 +364,18 @@ function renderLots(){
         <td class="mono">${interferenceCell(l)}</td>
         <td class="mono">${photosCell(l)}</td>
         <td>${received}${qty}<br><span style="color:var(--ink-3);font-size:11.5px;">${l.n_submissions} submission${l.n_submissions===1?'':'s'}</span></td>
+        <td class="mono">${expiration}</td>
         <td>${dashLink}</td>
       </tr>
     `;
   }).join('');
   table.innerHTML = thead + `<tbody>${tbody}</tbody>`;
+  table.querySelectorAll('tbody tr[data-dash-url]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.closest('a')) return;
+      window.open(tr.dataset.dashUrl, '_blank', 'noopener');
+    });
+  });
 }
 
 const BOLO_STATUS_LABEL = {
@@ -442,7 +497,7 @@ function renderBolo(){
   grid.innerHTML = thead + `<tbody>${tbody}</tbody>`;
 }
 
-['searchInput', 'filterSelect', 'sortSelect'].forEach(id => {
+['searchInput', 'filterSelect', 'expirationFilterSelect', 'sortSelect'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderLots);
   document.getElementById(id).addEventListener('change', renderLots);
 });
@@ -455,7 +510,7 @@ function renderBolo(){
 function showView(view){
   document.querySelectorAll('section.view').forEach(s => s.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
-  const toolbarExtras = ['searchWrap', 'filterSelect', 'sortSelect', 'resultCount'];
+  const toolbarExtras = ['searchWrap', 'filterSelect', 'expirationFilterSelect', 'sortSelect', 'resultCount'];
   const showExtras = view === 'lots';
   toolbarExtras.forEach(id => document.getElementById(id).style.display = showExtras ? '' : 'none');
 }
