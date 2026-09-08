@@ -38,6 +38,14 @@ STRIP_TYPES = {
         ],
         'true_negative': {'run_field': 'wat_run', 'min_run': 5},
         'interferences': ['DIPHEN', 'PROC', 'LIDO', 'LEVAM', 'MDONE', 'METH', 'MDMA'],
+        # Verbatim copy of build_fts.py's own SUB_LABEL -- duplicated rather
+        # than imported since this file is meant to be readable standalone
+        # (same reasoning as the hi_mg/follow_up_mgs duplication of
+        # build_fts.py's LEVEL_MG, noted below).
+        'interference_labels': {
+            'DIPHEN': 'Diphenhydramine', 'PROC': 'Procaine', 'LIDO': 'Lidocaine',
+            'LEVAM': 'Levamisole', 'MDONE': 'Methadone', 'METH': 'Methamphetamine', 'MDMA': 'MDMA',
+        },
         'hi_mg': 2.0, 'follow_up_mgs': [0.7, 0.2],
     },
     'XTS': {
@@ -60,6 +68,13 @@ STRIP_TYPES = {
             'DIPHEN', 'KETA', 'LIDO', 'PREMETH', 'CETIRI', 'METH', 'MDMA',
             'ROMI', 'TIZA', 'CLONI', 'APRACLONI',
         ],
+        # Verbatim copy of build_xts.py's own SUB_LABEL -- see the matching
+        # comment on FTS's interference_labels above.
+        'interference_labels': {
+            'DIPHEN': 'Diphenhydramine', 'KETA': 'Ketamine', 'LIDO': 'Lidocaine', 'PREMETH': 'Promethazine',
+            'CETIRI': 'Cetirizine', 'METH': 'Methamphetamine', 'MDMA': 'MDMA', 'ROMI': 'Romifidine',
+            'TIZA': 'Tizanidine', 'CLONI': 'Clonidine', 'APRACLONI': 'Apraclonidine',
+        },
         'hi_mg': 2.0, 'follow_up_mgs': [0.7, 0.2],
     },
     # BTS / MTS / NTS: no build_bts.py/build_mts.py/build_nts.py exists yet

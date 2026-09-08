@@ -245,6 +245,7 @@ def evaluate_completion(strip_type, dash_lot):
 
     matrix = d.get('matrix') or {}
     empty_level = {'run': 0, 'hits': 0}
+    sub_labels = rules.get('interference_labels', {})
     interference_results = []
     for sub in rules['interferences']:
         st = matrix.get(sub) or {}
@@ -261,7 +262,7 @@ def evaluate_completion(strip_type, dash_lot):
         # fully-characterized interference still counts as complete here.
         complete = hi_run > 0 and (hi_hits == 0 or has_follow_up)
         interference_results.append({
-            'substance': sub, 'hi_run': hi_run, 'hi_hits': hi_hits,
+            'substance': sub, 'label': sub_labels.get(sub, sub), 'hi_run': hi_run, 'hi_hits': hi_hits,
             'needs_follow_up': hi_run > 0 and hi_hits > 0,
             'has_follow_up': has_follow_up, 'complete': complete,
         })
@@ -278,6 +279,21 @@ def evaluate_completion(strip_type, dash_lot):
         'interferences': interference_results, 'interferences_complete': interferences_complete,
         'n_photos_packaging': n_pack, 'n_photos_strip': n_strip, 'photos_complete': photos_complete,
     }
+
+
+def _parse_dashboard_expiration(s):
+    """fts.html's/xts.html's own per-lot `expirations` field is a list of
+    'M/D/YYYY' display strings (see build_fts.py's/build_xts.py's own
+    `expirations`/`expiration_dates` -- a real, submitter-reported
+    expiration date, distinct from and usually far more complete than the
+    brand-new intake form's own expiration field, which almost no lot has
+    been retroactively logged against yet). Convert to this file's usual
+    ISO 'YYYY-MM-DD' so it sorts/compares the same way as everything else
+    here; a malformed string shouldn't crash the whole build."""
+    try:
+        return datetime.strptime(s, '%m/%d/%Y').strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        return None
 
 
 def merge_lots(intake_by_lot, dashboards):
@@ -304,6 +320,23 @@ def merge_lots(intake_by_lot, dashboards):
         completion = evaluate_completion(strip_type, rec['dash'])
         d = rec['dash'] or {}
         intake = rec['intake']
+
+        # Merge both possible sources of an expiration date -- the intake
+        # form's (almost never logged yet) and the dashboard's own
+        # submitter-reported one (usually the only real data that
+        # exists). Intake wins as the primary/sort value when present
+        # (a human physically checked the lot to log it); all distinct
+        # dates seen from either source are kept in expiration_all so a
+        # genuine data disagreement (e.g. two submitters typo'd
+        # differently) stays visible instead of silently picked between --
+        # see Data-Sources.md's tracked "mistyped expiration dates" issue.
+        intake_expiration = intake['expiration'] if intake else None
+        dash_expirations = sorted({
+            e for e in (_parse_dashboard_expiration(s) for s in (d.get('expirations') or [])) if e
+        })
+        all_expirations = sorted(set(([intake_expiration] if intake_expiration else []) + dash_expirations))
+        primary_expiration = intake_expiration or (all_expirations[0] if all_expirations else None)
+
         out.append({
             'strip_type': strip_type,
             'strip_type_label': rules['label'] if rules else f'{strip_type} (not yet supported)',
@@ -312,7 +345,7 @@ def merge_lots(intake_by_lot, dashboards):
             'first_received': intake['first_received'] if intake else None,
             'total_qty': intake['total_qty'] if intake else None,
             'intake_notes': intake['notes'] if intake else '',
-            'expiration': intake['expiration'] if intake else None,
+            'expiration': primary_expiration, 'expiration_all': all_expirations,
             'n_submissions': d.get('n_submissions', 0),
             'first_submitted': d.get('first_submitted'), 'last_submitted': d.get('last_submitted'),
             'complete': completion['complete'] if completion else None,
