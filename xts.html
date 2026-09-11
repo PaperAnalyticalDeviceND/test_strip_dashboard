@@ -1019,22 +1019,35 @@ function renderCurrentView(){
   else if (currentView === 'matrix') renderMatrix();
   else if (currentView === 'log') renderLog();
 }
-document.getElementById('viewSwitch').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-view]');
-  if (!btn) return;
-  currentView = btn.dataset.view;
-  document.querySelectorAll('#viewSwitch button').forEach(b=>b.classList.toggle('active', b===btn));
+function switchToView(view){
+  if (!document.getElementById('view-'+view)) return;
+  currentView = view;
+  document.querySelectorAll('#viewSwitch button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   document.querySelectorAll('section.view').forEach(s=>s.classList.remove('active'));
   document.getElementById('view-'+currentView).classList.add('active');
   document.getElementById('sortSelect').style.display = currentView==='log' ? 'none' : '';
   window.goatcounter?.count?.({path: 'xts-view-'+currentView, title: 'XTS view: '+currentView, event: true});
   renderCurrentView();
+}
+document.getElementById('viewSwitch').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-view]');
+  if (!btn) return;
+  switchToView(btn.dataset.view);
 });
 document.getElementById('searchInput').addEventListener('input', renderCurrentView);
 document.getElementById('sortSelect').addEventListener('change', () => { matrixSort.code = null; renderCurrentView(); });
 
 renderStats();
-renderCurrentView();
+
+// Deep link support: a URL like "xts.html#view=matrix" opens straight into
+// the Interference matrix tab (or "log" / "lots") instead of always
+// landing on the default Lots overview -- used by the plain-language
+// summary cards to link a specific claim to the data behind it.
+(function initViewFromHash(){
+  const m = location.hash.match(/^#view=(lots|matrix|log)$/);
+  if (m) switchToView(m[1]);
+  else renderCurrentView();
+})();
 
 // Deep link support: templates/progress_template.html links here as
 // "xts.html#lot=<encodeURIComponent(brand+'||'+lot)>" so clicking a lot on
