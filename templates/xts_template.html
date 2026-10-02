@@ -31,6 +31,9 @@
     --heat-3:#d8793e;
     --heat-4:#b8471f;
     --shadow: 0 1px 2px rgba(15,25,28,0.06), 0 6px 20px -8px rgba(15,25,28,0.12);
+    /* three-part result bar: colour-blind-safe trio (blue / purple / charcoal).
+       Inconclusive is also hatched, so no segment relies on colour alone. */
+    --seg-clear:#0074D9; --seg-inc:#5C2D91; --seg-inc-alt:#D9CCEB; --seg-miss:#333333;
     --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "URW Palladio L", Georgia, serif;
     --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
@@ -45,6 +48,7 @@
       --good:#57c383; --good-tint:#15271d; --warn:#e0a942; --warn-tint:#2b2416; --crit:#e2695a; --crit-tint:#2c1a17;
       --heat-0:#1c221e; --heat-1:#4a3a24; --heat-2:#7a4f26; --heat-3:#a3612a; --heat-4:#c96f2e;
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+    --seg-clear:#4DA3FF; --seg-inc:#B38CE8; --seg-inc-alt:#4B3A6B; --seg-miss:#B9C2C7;
     }
   }
   :root[data-theme="dark"]{
@@ -55,6 +59,7 @@
     --good:#57c383; --good-tint:#15271d; --warn:#e0a942; --warn-tint:#2b2416; --crit:#e2695a; --crit-tint:#2c1a17;
     --heat-0:#1c221e; --heat-1:#4a3a24; --heat-2:#7a4f26; --heat-3:#a3612a; --heat-4:#c96f2e;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -10px rgba(0,0,0,0.5);
+    --seg-clear:#4DA3FF; --seg-inc:#B38CE8; --seg-inc-alt:#4B3A6B; --seg-miss:#B9C2C7;
   }
   :root[data-theme="light"]{
     --bg:#f2f4f5; --surface:#ffffff; --surface-2:#e8ecee; --surface-3:#dde2e5;
@@ -141,6 +146,19 @@
   .metric .mval small{font-size:10px; font-weight:500; color:var(--ink-3);}
   .bar-track{height:5px; background:var(--surface-3); border-radius:3px; margin-top:6px; overflow:hidden;}
   .bar-fill{height:100%; border-radius:3px;}
+  .tri-bar{display:flex; height:9px; background:var(--surface-3); border-radius:5px; overflow:hidden; margin-top:6px; gap:1px;}
+  .tri-bar > span{display:block; height:100%; min-width:0;}
+  .tri-bar .seg-clear{background:var(--seg-clear);}
+  .tri-bar .seg-inc{background:repeating-linear-gradient(45deg, var(--seg-inc) 0 3px, var(--seg-inc-alt) 3px 6px);}
+  .tri-bar .seg-miss{background:var(--seg-miss);}
+  .tri-split{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-3); margin-top:5px; line-height:1.4;}
+  .tri-legend{display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:var(--ink-2); margin:0 0 14px;}
+  .tri-legend span{display:inline-flex; align-items:center; gap:7px;}
+  .tri-legend i{display:inline-block; width:22px; height:9px; border-radius:3px;}
+  .tri-legend .seg-clear{background:var(--seg-clear);}
+  .tri-legend .seg-inc{background:repeating-linear-gradient(45deg, var(--seg-inc) 0 3px, var(--seg-inc-alt) 3px 6px);}
+  .tri-legend .seg-miss{background:var(--seg-miss);}
+  .water-tile .tri-bar{height:11px; margin-top:8px;}
   .status-good{color:var(--good);} .fill-good{background:var(--good);}
   .status-warn{color:var(--warn);} .fill-warn{background:var(--warn);}
   .status-crit{color:var(--crit);} .fill-crit{background:var(--crit);}
@@ -287,6 +305,11 @@
       <h2>Detection of xylazine</h2>
       <div class="note">DI (deionized) water has very low ion content; our tap water is high in calcium and magnesium ions, which can interfere with lateral-flow strip chemistry. Comparing DI vs. tap at the same concentration isolates that effect.</div>
     </div>
+    <div class="tri-legend" aria-label="Key to the result bars">
+      <span><i class="seg-clear"></i>Detected (no test line)</span>
+      <span><i class="seg-inc"></i>Inconclusive (faint test line, 1&ndash;3 out of 10)</span>
+      <span><i class="seg-miss"></i>Missed (clear test line, 4&ndash;10 out of 10)</span>
+    </div>
     <div class="water-compare" id="waterCompare"></div>
   </div>
 
@@ -301,8 +324,8 @@
       <input id="searchInput" type="text" placeholder="Search brand or lot&hellip;" autocomplete="off">
     </div>
     <select id="sortSelect">
-      <option value="di_asc">Sort: 2500 DI rate ↑</option>
-      <option value="di_desc">Sort: 2500 DI rate ↓</option>
+      <option value="di_asc">Sort: 2500 DI detected ↑</option>
+      <option value="di_desc">Sort: 2500 DI detected ↓</option>
       <option value="hardwater_asc">Sort: less affected by hard water</option>
       <option value="recent">Sort: most recent</option>
       <option value="most_tested">Sort: most submissions</option>
@@ -371,7 +394,7 @@ function fmtPct(v){ return v === null || v === undefined ? '—' : v.toFixed(1) 
 function fmtRatioPhrase(pos, run){
   if (!run) return null;
   if (pos === 0) return `none of ${run} samples`;
-  if (pos === run) return `all ${run} samples`;
+  if (pos === run) return run === 1 ? 'the 1 sample' : `all ${run} samples`;
   const tenths = Math.min(9, Math.max(1, Math.round((pos / run) * 10)));
   return `about ${tenths} out of ten samples`;
 }
@@ -490,6 +513,34 @@ const diStatus = r => statusFor(r, 95, 80);
 const tapStatus = r => statusFor(r, 90, 70);
 const lowStatus = r => statusFor(r, 90, 70);
 
+/* ---------- three-part results: detected / inconclusive / missed ---------- */
+// Detected = flat "Positive" (no test line). Inconclusive = a faint test line
+// (intensity 1-3), which is too easy to miss in normal light to call either
+// way. Missed = a clear test line (intensity 4+). Fields come from build_xts.py.
+function triParts(clear, faint, miss){
+  const run = clear + faint + miss;
+  const pct = n => run ? Math.round(1000 * n / run) / 10 : 0;
+  return {clear, faint, miss, run, pClear: pct(clear), pFaint: pct(faint), pMiss: pct(miss)};
+}
+function triBar(t){
+  if (!t.run) return `<div class="tri-bar" aria-hidden="true"></div>`;
+  const label = `${t.clear} detected, ${t.faint} inconclusive (faint line), ${t.miss} missed, out of ${t.run}`;
+  return `<div class="tri-bar" role="img" aria-label="${label}" title="${label}">` +
+    (t.clear ? `<span class="seg-clear" style="flex:${t.clear}"></span>` : '') +
+    (t.faint ? `<span class="seg-inc" style="flex:${t.faint}"></span>` : '') +
+    (t.miss ? `<span class="seg-miss" style="flex:${t.miss}"></span>` : '') + `</div>`;
+}
+function triText(t){
+  return `${t.clear} detected &middot; ${t.faint} inconclusive &middot; ${t.miss} missed`;
+}
+// one submission's panel is [run, pos, clear]; show clear/run and flag any faint or missed reads
+function subTriCell(p){
+  const run = p[0], clear = p[2], faint = p[1] - p[2], miss = p[0] - p[1];
+  const extra = [faint ? faint + ' faint' : '', miss ? miss + ' missed' : ''].filter(Boolean).join(', ');
+  return `${clear}/${run}` + (extra ? ` <small style="color:var(--ink-3)">(${extra})</small>` : '');
+}
+function triFromLot(l, key){ return triParts(l[`tp_${key}_clear`], l[`tp_${key}_faint`], l[`tp_${key}_miss`]); }
+
 /* ---------- hero stats + water comparison ---------- */
 function renderStats(){
   const o = DATA.overall;
@@ -508,16 +559,20 @@ function renderStats(){
     </div>`).join('');
 
   const wc = [
-    {label:'2500 ng/mL · DI water', rate:o.pooled_2500_di_rate, n:o.pooled_2500_di_n},
-    {label:'2500 ng/mL · hard tap water', rate:o.pooled_2500_tap_rate, n:o.pooled_2500_tap_n},
-    {label:'1000 ng/mL · DI water', rate:o.pooled_1000_di_rate, n:o.pooled_1000_di_n},
+    {label:'2500 ng/mL · DI water', sp:o.pooled_2500_di_split},
+    {label:'2500 ng/mL · hard tap water', sp:o.pooled_2500_tap_split},
+    {label:'1000 ng/mL · DI water', sp:o.pooled_1000_di_split},
   ];
-  document.getElementById('waterCompare').innerHTML = wc.map(w => `
+  document.getElementById('waterCompare').innerHTML = wc.map(w => {
+    const t = triParts(w.sp[0], w.sp[1], w.sp[2]);
+    return `
     <div class="water-tile">
       <div class="wlabel">${w.label}</div>
-      <div class="wval">${fmtPct(w.rate)}</div>
-      <div class="wsub">${w.n[0]}/${w.n[1]} strips read positive</div>
-    </div>`).join('');
+      <div class="wval">${fmtPct(t.pClear)} <small style="font-size:12px;font-weight:500;color:var(--ink-3);">detected</small></div>
+      ${triBar(t)}
+      <div class="wsub">${triText(t)} of ${t.run} strips</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------- lots view ---------- */
@@ -525,11 +580,13 @@ function lotSearchText(l){ return (l.brand + ' ' + l.lot).toLowerCase(); }
 
 function sortLots(list, mode){
   const arr = list.slice();
-  if (mode === 'di_asc') arr.sort((a,b)=>(a.tp_2500_di_rate??999)-(b.tp_2500_di_rate??999));
-  else if (mode === 'di_desc') arr.sort((a,b)=>(b.tp_2500_di_rate??-1)-(a.tp_2500_di_rate??-1));
+  // "Detected" share = flat no-line reads only (faint 1-3 lines are inconclusive), matching the bars.
+  const det = (l, k) => l[`tp_${k}_run`] ? 100 * l[`tp_${k}_clear`] / l[`tp_${k}_run`] : null;
+  if (mode === 'di_asc') arr.sort((a,b)=>(det(a,'2500_di')??999)-(det(b,'2500_di')??999));
+  else if (mode === 'di_desc') arr.sort((a,b)=>(det(b,'2500_di')??-1)-(det(a,'2500_di')??-1));
   else if (mode === 'hardwater_asc') arr.sort((a,b)=>{
-    const ga = (a.tp_2500_di_rate??0)-(a.tp_2500_tap_rate??0);
-    const gb = (b.tp_2500_di_rate??0)-(b.tp_2500_tap_rate??0);
+    const ga = (det(a,'2500_di')??0)-(det(a,'2500_tap')??0);
+    const gb = (det(b,'2500_di')??0)-(det(b,'2500_tap')??0);
     return ga - gb;
   });
   else if (mode === 'recent') arr.sort((a,b)=> (b.last_submitted||'').localeCompare(a.last_submitted||''));
@@ -571,13 +628,14 @@ function sortLots(list, mode){
   return arr;
 }
 
-function metricBlock(label, rate, n_pos, n_run, statusFn){
-  const st = statusFn(rate);
+function metricBlock(label, l, key){
+  const t = triFromLot(l, key);
   return `
     <div class="metric">
       <div class="mlabel">${label}</div>
-      <div class="mval status-${st}">${fmtPct(rate)} <small>(${n_pos}/${n_run})</small></div>
-      <div class="bar-track"><div class="bar-fill fill-${st}" style="width:${rate??0}%"></div></div>
+      <div class="mval">${t.run ? fmtPct(t.pClear) : '&mdash;'} <small>(${t.clear}/${t.run})</small></div>
+      ${triBar(t)}
+      <div class="tri-split">${t.faint} inconclusive &middot; ${t.miss} missed</div>
     </div>`;
 }
 
@@ -624,9 +682,9 @@ function lotCardHTML(l, sortMode){
         <div class="thumb-wrap">${thumb}${photoBadge}</div>
       </div>
       <div class="metric-row3">
-        ${metricBlock('2500 DI', l.tp_2500_di_rate, l.tp_2500_di_pos, l.tp_2500_di_run, diStatus)}
-        ${metricBlock('2500 Tap', l.tp_2500_tap_rate, l.tp_2500_tap_pos, l.tp_2500_tap_run, tapStatus)}
-        ${metricBlock('1000 DI', l.tp_1000_di_rate, l.tp_1000_di_pos, l.tp_1000_di_run, lowStatus)}
+        ${metricBlock('2500 DI', l, '2500_di')}
+        ${metricBlock('2500 Tap', l, '2500_tap')}
+        ${metricBlock('1000 DI', l, '1000_di')}
       </div>
       <div class="chip-row">${chips}</div>
       ${sortMode === 'performance' ? performanceTierChip(l) : ''}
@@ -709,27 +767,26 @@ function expirationClause(l){
   return ` This lot's recorded expiration (${latestStr}) has passed, so it's probably no longer available for purchase.`;
 }
 function lotSummary(l){
-  const tpConditions = [];
-  if (l.tp_2500_di_run) tpConditions.push(l.tp_2500_di_rate);
-  if (l.tp_2500_tap_run) tpConditions.push(l.tp_2500_tap_rate);
-  if (l.tp_1000_di_run) tpConditions.push(l.tp_1000_di_rate);
-  const tnRate = l.tn_run ? 100 * (l.tn_run - l.tn_pos) / l.tn_run : null;
-  if (l.tn_run) tpConditions.push(tnRate);
-  const allPerfect = tpConditions.length > 0 && tpConditions.every(r => r === 100);
+  // Detection is summarized across all three concentration/water tests, in
+  // three parts: detected (no test line), inconclusive (faint line, 1-3) and
+  // missed (clear line, 4+). The per-condition split is in the stat panel
+  // right below the summary.
+  const keys = ['2500_di', '2500_tap', '1000_di'];
+  const clear = keys.reduce((a, k) => a + (l[`tp_${k}_clear`] || 0), 0);
+  const faint = keys.reduce((a, k) => a + (l[`tp_${k}_faint`] || 0), 0);
+  const miss  = keys.reduce((a, k) => a + (l[`tp_${k}_miss`] || 0), 0);
+  const tpRun = clear + faint + miss;
+  const tnClean = l.tn_run ? (l.tn_run - l.tn_pos) === l.tn_run : true;
+  const allPerfect = tpRun > 0 && faint === 0 && miss === 0 && tnClean;
 
   let sentence;
   if (allPerfect) {
-    // Every condition tested came back perfect — the per-concentration
-    // breakdown is redundant with the stat panel shown right below the
-    // summary, so skip straight to the one-line verdict.
-    sentence = 'This lot performed perfectly across all xylazine detection and true-negative tests.';
+    sentence = 'This lot performed perfectly across all xylazine detection and true-negative tests, with no faint lines.';
+  } else if (tpRun === 0) {
+    sentence = 'No test results recorded yet for this lot.';
   } else {
-    const parts = [];
-    if (l.tp_2500_di_run) parts.push(`detected xylazine in ${fmtRatioPhrase(l.tp_2500_di_pos, l.tp_2500_di_run)} at 2500 ng/mL DI water`);
-    if (l.tp_2500_tap_run) parts.push(`${fmtRatioPhrase(l.tp_2500_tap_pos, l.tp_2500_tap_run)} at 2500 ng/mL tap water`);
-    if (l.tp_1000_di_run) parts.push(`${fmtRatioPhrase(l.tp_1000_di_pos, l.tp_1000_di_run)} at 1000 ng/mL DI water`);
-    if (l.tn_run) parts.push(`correctly read true negative in ${fmtRatioPhrase(l.tn_run - l.tn_pos, l.tn_run)} of plain water`);
-    sentence = parts.length ? ('This lot ' + parts.join('; ') + '.') : 'No test results recorded yet for this lot.';
+    sentence = `Of ${tpRun} detection tests: ${clear} clearly detected, ${faint} inconclusive (faint line), ${miss} missed.`;
+    if (l.tn_run) sentence += ` In plain water it read correctly ${fmtRatioPhrase(l.tn_run - l.tn_pos, l.tn_run)}.`;
   }
   const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
   if (l.interferents.length) {
@@ -766,9 +823,9 @@ function openDrawer(key){
     <tr>
       <td class="mono${s.post_exp ? ' post-exp' : ''}"${s.post_exp ? ` title="Tested after this submission's recorded expiration date (${esc(s.expiration)})"` : ''}>${s.timestamp.split(' ')[0]}${s.post_exp ? '<span class="post-exp-tag">post exp</span>' : ''}</td>
       <td>${esc(s.tester)}</td>
-      <td class="mono">${s.tp_2500_di[1]}/${s.tp_2500_di[0]}</td>
-      <td class="mono">${s.tp_2500_tap[1]}/${s.tp_2500_tap[0]}</td>
-      <td class="mono">${s.tp_1000_di[1]}/${s.tp_1000_di[0]}</td>
+      <td class="mono">${subTriCell(s.tp_2500_di)}</td>
+      <td class="mono">${subTriCell(s.tp_2500_tap)}</td>
+      <td class="mono">${subTriCell(s.tp_1000_di)}</td>
       <td>${s.n_photos ? `<button class="drawer-photo-link" data-gallery-key="${keyAttr}">${s.n_photos} photo${s.n_photos>1?'s':''}</button>` : '—'}</td>
     </tr>`).join('');
   const photosLine = l.n_photos
@@ -787,10 +844,11 @@ function openDrawer(key){
       <button class="drawer-close" id="drawerCloseBtn" aria-label="Close">✕</button>
     </div>
     <p class="drawer-summary">${lotSummary(l)}</p>
+    <div class="tri-legend" style="margin-bottom:10px;"><span><i class="seg-clear"></i>Detected</span><span><i class="seg-inc"></i>Inconclusive (faint line)</span><span><i class="seg-miss"></i>Missed</span></div>
     <div class="drawer-metrics">
-      <div class="stat"><div class="label">2500 DI</div><div class="value status-${diStatus(l.tp_2500_di_rate)}">${fmtPct(l.tp_2500_di_rate)}</div><div class="foot">${l.tp_2500_di_pos}/${l.tp_2500_di_run}</div></div>
-      <div class="stat"><div class="label">2500 Tap</div><div class="value status-${tapStatus(l.tp_2500_tap_rate)}">${fmtPct(l.tp_2500_tap_rate)}</div><div class="foot">${l.tp_2500_tap_pos}/${l.tp_2500_tap_run}</div></div>
-      <div class="stat"><div class="label">1000 DI</div><div class="value status-${lowStatus(l.tp_1000_di_rate)}">${fmtPct(l.tp_1000_di_rate)}</div><div class="foot">${l.tp_1000_di_pos}/${l.tp_1000_di_run}</div></div>
+      <div class="stat"><div class="label">2500 DI</div><div class="value">${triFromLot(l,'2500_di').run ? fmtPct(triFromLot(l,'2500_di').pClear) : '&mdash;'}</div>${triBar(triFromLot(l,'2500_di'))}<div class="foot">${triText(triFromLot(l,'2500_di'))}</div></div>
+      <div class="stat"><div class="label">2500 Tap</div><div class="value">${triFromLot(l,'2500_tap').run ? fmtPct(triFromLot(l,'2500_tap').pClear) : '&mdash;'}</div>${triBar(triFromLot(l,'2500_tap'))}<div class="foot">${triText(triFromLot(l,'2500_tap'))}</div></div>
+      <div class="stat"><div class="label">1000 DI</div><div class="value">${triFromLot(l,'1000_di').run ? fmtPct(triFromLot(l,'1000_di').pClear) : '&mdash;'}</div>${triBar(triFromLot(l,'1000_di'))}<div class="foot">${triText(triFromLot(l,'1000_di'))}</div></div>
       <div class="stat"><div class="label">True negative</div><div class="value">${fmtPct(l.tn_specificity_rate)}</div><div class="foot">n=${l.tn_run}</div></div>
     </div>
     <h3>Known interferents</h3>
@@ -979,9 +1037,9 @@ const logCols = [
   {key:'tester', label:'Tester', render:s=>esc(s.tester)},
   {key:'brand', label:'Brand', render:s=>esc(s.brand)},
   {key:'lot', label:'Lot', render:s=>esc(s.lot), cls:'mono'},
-  {key:'di2500', label:'2500 DI', render:s=>`${s.tp_2500_di[1]}/${s.tp_2500_di[0]}`, cls:'mono'},
-  {key:'tap2500', label:'2500 Tap', render:s=>`${s.tp_2500_tap[1]}/${s.tp_2500_tap[0]}`, cls:'mono'},
-  {key:'di1000', label:'1000 DI', render:s=>`${s.tp_1000_di[1]}/${s.tp_1000_di[0]}`, cls:'mono'},
+  {key:'di2500', label:'2500 DI', render:s=>subTriCell(s.tp_2500_di), cls:'mono'},
+  {key:'tap2500', label:'2500 Tap', render:s=>subTriCell(s.tp_2500_tap), cls:'mono'},
+  {key:'di1000', label:'1000 DI', render:s=>subTriCell(s.tp_1000_di), cls:'mono'},
   {key:'n_photos', label:'Photos', render:s=> s.n_photos ? `${s.n_photos} ↗` : '—', cls:'mono'},
   {key:'notes', label:'Notes', render:s=> s.notes ? `<span class="note-preview" title="${esc(s.notes)}">${esc(s.notes)}</span>` : '—'},
 ];

@@ -219,6 +219,15 @@ def build_dashboard_data(records):
             'tp_2500_di_run': L['tp']['2500_di'][0], 'tp_2500_di_pos': L['tp']['2500_di'][1], 'tp_2500_di_rate': rate(L['tp']['2500_di']),
             'tp_2500_tap_run': L['tp']['2500_tap'][0], 'tp_2500_tap_pos': L['tp']['2500_tap'][1], 'tp_2500_tap_rate': rate(L['tp']['2500_tap']),
             'tp_1000_di_run': L['tp']['1000_di'][0], 'tp_1000_di_pos': L['tp']['1000_di'][1], 'tp_1000_di_rate': rate(L['tp']['1000_di']),
+            # Three-way split of each true-positive panel (legacy *_pos/*_rate above
+            # still count a faint 1-3 line as detected; these fields do not):
+            #   clear = flat "Positive" (no test line), faint = test line of
+            #   intensity 1-3 (inconclusive), miss = test line of intensity 4+.
+            **{f'tp_{k}_{part}': val
+               for k in ('2500_di', '2500_tap', '1000_di')
+               for part, val in (('clear', L['tp'][k][2]),
+                                 ('faint', L['tp'][k][1] - L['tp'][k][2]),
+                                 ('miss', L['tp'][k][0] - L['tp'][k][1]))},
             'clarity_run': clarity_run, 'clarity_clean': clarity_clean,
             'clarity_rate': round(100 * clarity_clean / clarity_run, 1) if clarity_run else None,
             'tn_run': run_tn, 'tn_pos': L['tn_pos'],
@@ -245,7 +254,16 @@ def build_dashboard_data(records):
     tn_pos_total = sum(l['tn_pos'] for l in lot_out)
     dts = [r['dt'] for r in records]
 
+    def split(key):
+        # [clear, faint, miss, run] pooled across lots
+        c = sum(l[f'tp_{key}_clear'] for l in lot_out)
+        f = sum(l[f'tp_{key}_faint'] for l in lot_out)
+        m = sum(l[f'tp_{key}_miss'] for l in lot_out)
+        return [c, f, m, c + f + m]
+
     overall = {
+        'pooled_2500_di_split': split('2500_di'), 'pooled_2500_tap_split': split('2500_tap'),
+        'pooled_1000_di_split': split('1000_di'),
         'n_lots': len(lot_out), 'n_submissions': len(records), 'n_testers': len(set(r['name'] for r in records)),
         'pooled_2500_di_rate': di_rate, 'pooled_2500_tap_rate': tap_rate, 'pooled_1000_di_rate': low_rate,
         'pooled_2500_di_n': [di_pos, di_run], 'pooled_2500_tap_n': [tap_pos, tap_run], 'pooled_1000_di_n': [low_pos, low_run],
