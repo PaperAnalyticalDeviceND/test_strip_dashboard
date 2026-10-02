@@ -31,6 +31,23 @@ def extract_overall(dashboard_html_path):
     return extract_dashboard_data(dashboard_html_path)['overall']
 
 
+def _xts_split(xts, key):
+    split = xts.get(f'pooled_{key}_split')
+    if not split or not split[3]:
+        raise RuntimeError(f'xts.html has no pooled_{key}_split; rebuild xts.html with the three-part build_xts.py first')
+    return split  # [clear, faint, miss, run]
+
+
+def xts_clear_pct(xts, key):
+    c, f, m, run = _xts_split(xts, key)
+    return f"{100 * c / run:.0f}"
+
+
+def xts_faint_pct(xts):
+    parts = [_xts_split(xts, k) for k in ('2500_di', '2500_tap', '1000_di')]
+    return f"{100 * sum(p[1] for p in parts) / sum(p[3] for p in parts):.0f}"
+
+
 def main():
     if len(sys.argv) != 8:
         print(__doc__)
@@ -51,8 +68,11 @@ def main():
         '__FTS_RATE__': f"{fts['pooled_fen_rate']:.1f}",
         '__XTS_LOTS__': str(xts['n_lots']),
         '__XTS_SUBS__': str(xts['n_submissions']),
-        '__XTS_DI_RATE__': f"{xts['pooled_2500_di_rate']:.1f}",
-        '__XTS_TAP_RATE__': f"{xts['pooled_2500_tap_rate']:.1f}",
+        # Faint test lines (intensity 1-3) are "inconclusive", not detections, so the hub
+        # quotes the share of reads that were clearly detected, plus the inconclusive share.
+        '__XTS_DI_RATE__': xts_clear_pct(xts, '2500_di'),
+        '__XTS_TAP_RATE__': xts_clear_pct(xts, '2500_tap'),
+        '__XTS_FAINT_RATE__': xts_faint_pct(xts),
         '__PROGRESS_LOTS__': str(progress['n_lots']),
         '__PROGRESS_COMPLETE__': str(progress['n_complete']),
         '__PROGRESS_BOLO__': str(progress['n_bolo']),
@@ -69,7 +89,7 @@ def main():
         f.write(html)
     print(f'wrote {out_path} ({len(html)} bytes)')
     print(f"FTS: {fts['n_lots']} lots, {fts['n_submissions']} submissions, {fts['pooled_fen_rate']:.1f}% pooled")
-    print(f"XTS: {xts['n_lots']} lots, {xts['n_submissions']} submissions, DI {xts['pooled_2500_di_rate']:.1f}% / tap {xts['pooled_2500_tap_rate']:.1f}%")
+    print(f"XTS: {xts['n_lots']} lots, {xts['n_submissions']} submissions, clearly detected DI {xts_clear_pct(xts, '2500_di')}% / tap {xts_clear_pct(xts, '2500_tap')}%, inconclusive {xts_faint_pct(xts)}% of all detection reads")
     print(f"Progress tracker: {progress['n_lots']} lots, {progress['n_complete']} complete, {progress['n_bolo']} BOLO")
 
     methodology_html = open(methodology_template_path, encoding='utf-8').read()
