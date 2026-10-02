@@ -149,26 +149,57 @@ def lotkey(brand, lot):
     return f"{brand.strip()}||{lot.upper().replace(' ', '')}"
 
 
+def _unclear_row(ts_raw, dt, name, reason, r):
+    """A whole intake-form entry that could not be placed on the tracker. Kept
+    and shown as "unclear input" instead of being dropped, so a typo or a
+    half-filled form is seen and fixed rather than silently missing."""
+    typed = ' | '.join(c.strip() for c in r[3:] if c and c.strip())
+    return {'dt_display': dt.strftime('%-m/%-d/%Y') if dt else (sanitize_text(ts_raw, max_len=30) or 'unknown date'),
+            'name': name, 'reason': reason, 'typed': sanitize_text(typed, max_len=200)}
+
+
 def parse_intake_rows(rows):
-    """Split raw sheet rows into (intake_events, bolo_requests) by the
-    branch-selector column. Rows with an unrecognized/blank branch, or
-    missing required fields for their branch, are skipped rather than
-    guessed at."""
-    intake, bolo = [], []
+    """Split raw sheet rows into (intake_events, bolo_requests, unclear_rows)
+    by the branch-selector column. Nothing is guessed at, and nothing is
+    silently dropped: a row that cannot be placed (unreadable timestamp,
+    unrecognised submission type, missing brand/lot/strip type) is returned in
+    `unclear_rows`, and a single field that cannot be read (expiration, date
+    received, quantity) is kept as raw text on the event under `unclear`."""
+    intake, bolo, unclear_rows = [], [], []
     for r in rows:
+        r = list(r) + [''] * (len(COL) + 2 - len(r))
+        if not any(c and str(c).strip() for c in r):
+            continue                                   # a genuinely blank row
         dt = excel_serial_to_dt(r[COL['ts']])
+        name = r[COL['name']].strip()
         if dt is None:
+            unclear_rows.append(_unclear_row(r[COL['ts']], None, name, 'The timestamp could not be read', r))
             continue
         branch = r[COL['branch']].strip()
-        name = r[COL['name']].strip() if len(r) > COL['name'] else ''
 
         if branch == BRANCH_INTAKE:
             brand = r[COL['intake_brand']].strip()
             lot = r[COL['intake_lot']].strip()
             strip_type = r[COL['intake_strip_type']].strip().upper()
-            if not brand or not lot or not strip_type:
+            missing = [n for n, v in (('brand', brand), ('lot number', lot), ('strip type', strip_type)) if not v]
+            if missing:
+                unclear_rows.append(_unclear_row(r[COL['ts']], dt, name, 'Missing ' + ', '.join(missing), r))
                 continue
-            exp_dt, exp_month_only = parse_expiration_text(r[COL['intake_expiration']])
+            unclear = {}
+
+            exp_raw = r[COL['intake_expiration']].strip()
+            exp_dt, exp_month_only = parse_expiration_text(exp_raw)
+            if exp_raw and exp_dt is None:
+                unclear['expiration'] = sanitize_text(exp_raw, max_len=60)
+
+            rec_raw = r[COL['intake_date_received']].strip()
+            date_received = excel_serial_to_dt(rec_raw) if rec_raw else None
+            if rec_raw and date_received is None:
+                alt, alt_month_only = parse_expiration_text(rec_raw)
+                date_received = None if alt_month_only else alt
+            if rec_raw and date_received is None:
+                unclear['date_received'] = sanitize_text(rec_raw, max_len=60)
+
             qty_raw = r[COL['intake_qty']].strip()
             # A free-text cell anyone with form access can type into --
             # tolerate "inf"/"nan"/absurd numbers (float() parses all of
@@ -180,25 +211,31 @@ def parse_intake_rows(rows):
                     qty = None
             except (ValueError, OverflowError):
                 qty = None
+            if qty_raw and qty is None:
+                unclear['qty'] = sanitize_text(qty_raw, max_len=60)
+
             intake.append({
                 'dt': dt, 'name': name, 'strip_type': strip_type,
                 'brand': brand, 'lot': fix_numeric_id(lot),
                 'expiration': exp_dt, 'expiration_month_only': exp_month_only,
-                'date_received': excel_serial_to_dt(r[COL['intake_date_received']]),
-                'qty': qty,
+                'date_received': date_received,
+                'qty': qty, 'unclear': unclear,
                 'notes': sanitize_text(r[COL['intake_notes']]) if len(r) > COL['intake_notes'] else '',
             })
         elif branch == BRANCH_BOLO:
             product = r[COL['bolo_product']].strip()
             if not product:
+                unclear_rows.append(_unclear_row(r[COL['ts']], dt, name, 'A purchase request with no brand/product', r))
                 continue
             bolo.append({
                 'dt': dt, 'name': name, 'product': sanitize_text(product, max_len=200),
                 'strip_type': r[COL['bolo_strip_type']].strip().upper() if len(r) > COL['bolo_strip_type'] else '',
                 'reason': sanitize_text(r[COL['bolo_reason']]) if len(r) > COL['bolo_reason'] else '',
             })
-        # else: blank/unrecognized branch -- skipped, not guessed at.
-    return intake, bolo
+        else:
+            unclear_rows.append(_unclear_row(r[COL['ts']], dt, name,
+                                             'The submission type was blank or not recognised' if not branch else f'Unrecognised submission type "{sanitize_text(branch, max_len=60)}"', r))
+    return intake, bolo, unclear_rows
 
 
 def _cell(r, idx):
@@ -258,6 +295,24 @@ def parse_feedback_rows(rows):
     return out
 
 
+def _unclear_fields(events):
+    """Fields whose most recent filled-in entry could not be read, as
+    {field: what was typed}. A later readable entry for the same field (a
+    correction) clears it."""
+    is_valid = {'expiration': lambda e: e['expiration'] is not None,
+                'date_received': lambda e: e['date_received'] is not None,
+                'qty': lambda e: e['qty'] is not None}
+    out = {}
+    for field, valid in is_valid.items():
+        for e in reversed(events):
+            if field in e['unclear']:
+                out[field] = e['unclear'][field]
+                break
+            if valid(e):
+                break
+    return out
+
+
 def group_intake_by_lot(intake_events):
     """One entry per (strip_type, lot), aggregating every intake event
     logged for it -- a lot can legitimately be received more than once."""
@@ -280,6 +335,7 @@ def group_intake_by_lot(intake_events):
             # "trust the latest entry" convention as `notes` above.
             'expiration': next((e['expiration'].strftime('%Y-%m-%d') for e in reversed(events) if e['expiration']), None),
             'expiration_month_only': next((e['expiration_month_only'] for e in reversed(events) if e['expiration']), False),
+            'unclear': _unclear_fields(events),
         }
     return out
 
@@ -422,6 +478,7 @@ def merge_lots(intake_by_lot, dashboards):
             'first_received': intake['first_received'] if intake else None,
             'total_qty': intake['total_qty'] if intake else None,
             'intake_notes': intake['notes'] if intake else '',
+            'unclear': (intake or {}).get('unclear', {}),
             'expiration': primary_expiration, 'expiration_all': all_expirations,
             'expiration_month_only': bool(exp_month_only and primary_expiration == intake_expiration),
             'n_submissions': d.get('n_submissions', 0),
@@ -590,8 +647,8 @@ def main():
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', 'progress_template.html')
 
     header, rows = parse_xlsx_sheet(intake_xlsx)
-    intake_events, bolo_requests = parse_intake_rows(rows)
-    print(f'parsed {len(intake_events)} intake event(s), {len(bolo_requests)} BOLO request(s)')
+    intake_events, bolo_requests, unclear_rows = parse_intake_rows(rows)
+    print(f'parsed {len(intake_events)} intake event(s), {len(bolo_requests)} BOLO request(s), {len(unclear_rows)} unclear row(s)')
 
     fb_header, fb_rows = parse_xlsx_sheet(feedback_xlsx)
     feedback_rows = parse_feedback_rows(fb_rows)
@@ -613,9 +670,9 @@ def main():
         'dashboard_version': DASHBOARD_VERSION,
         'overall': {
             'n_lots': len(lots), 'n_complete': n_complete, 'n_incomplete': n_incomplete,
-            'n_unsupported': n_unsupported, 'n_bolo': len(bolo_out),
+            'n_unsupported': n_unsupported, 'n_bolo': len(bolo_out), 'n_unclear': len(unclear_rows),
         },
-        'lots': lots, 'bolo': bolo_out,
+        'lots': lots, 'bolo': bolo_out, 'unclear_rows': unclear_rows,
     }
 
     template_html = open(template_path, encoding='utf-8').read()
