@@ -480,7 +480,7 @@ function renderLots(){
     const isExpired = l.expiration && (new Date(l.expiration + 'T00:00:00') < new Date());
     const disagrees = l.expiration_all && l.expiration_all.length > 1;
     const expiration = l.expiration
-      ? `${esc(l.expiration)}${isExpired ? '<span class="expired-tag">EXPIRED</span>' : ''}`
+      ? `${l.expiration_month_only ? esc(l.expiration.slice(0,7)) + ' <span class="bolo-sub" title="Only a month and year were logged; treated as the end of that month">(month only)</span>' : esc(l.expiration)}${isExpired ? '<span class="expired-tag">EXPIRED</span>' : ''}`
         + (disagrees ? `<div class="bolo-sub" title="Different dates reported: ${esc(l.expiration_all.join(', '))}">&#9888; ${l.expiration_all.length} different dates reported</div>` : '')
       : 'not logged';
     const dashUrl = lotDashboardUrl(l);

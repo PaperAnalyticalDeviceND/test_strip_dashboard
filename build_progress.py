@@ -29,7 +29,9 @@ header row if either live Form's question order ever changes, exactly
 like every other hardcoded COL map in this repo (see build_fts.py's/
 build_xts.py's own "re-verify against a fresh header row" comment).
 """
+import calendar
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -74,6 +76,72 @@ COL_FEEDBACK = dict(
 )
 
 
+_MONTH_NAMES = {m: i for i, names in enumerate(
+    ['jan january', 'feb february', 'mar march', 'apr april', 'may', 'jun june', 'jul july',
+     'aug august', 'sep sept september', 'oct october', 'nov november', 'dec december'], start=1)
+    for m in names.split()}
+
+
+def parse_expiration_text(raw):
+    """Parse the lot-intake form's free-text expiration into (datetime, month_only).
+
+    The form field is typed by hand, so real entries look like "07/2028",
+    "04 2027", "2026-12", "10/21/2028" or "Jul 2028". Many strips print only a
+    month and year; a month-only date means the end of that month, so it is
+    returned as that month's last day with month_only=True. Anything that
+    cannot be read confidently returns (None, False) rather than guessing.
+    A plain date serial (a number) is also accepted.
+    """
+    v = (raw or '').strip()
+    if not v:
+        return None, False
+    try:
+        if re.fullmatch(r'\d+(\.\d+)?', v) and float(v) > 20000:
+            dt = excel_serial_to_dt(v)
+            return (dt, False) if dt else (None, False)
+    except (ValueError, OverflowError):
+        return None, False
+    sep = r'\s*[-/. ]\s*'
+    y = m = d = None
+    mt = re.fullmatch(r'(\d{1,2})' + sep + r'(\d{1,2})' + sep + r'(\d{2,4})', v)          # M/D/YYYY (US)
+    if mt:
+        m, d, y = int(mt[1]), int(mt[2]), int(mt[3])
+    else:
+        mt = re.fullmatch(r'(\d{4})' + sep + r'(\d{1,2})' + sep + r'(\d{1,2})', v)         # YYYY-MM-DD
+        if mt:
+            y, m, d = int(mt[1]), int(mt[2]), int(mt[3])
+        else:
+            mt = re.fullmatch(r'(\d{4})' + sep + r'(\d{1,2})', v)                           # YYYY-MM
+            if mt:
+                y, m = int(mt[1]), int(mt[2])
+            else:
+                mt = re.fullmatch(r'(\d{1,2})' + sep + r'(\d{4})', v)                       # MM/YYYY, "04 2027"
+                if mt:
+                    m, y = int(mt[1]), int(mt[2])
+                else:
+                    mt = re.fullmatch(r'([A-Za-z]{3,9})\.?,?\s*(?:(\d{1,2})(?:st|nd|rd|th)?,?\s*)?(\d{4})', v)   # Jul 2028, July 31 2028
+                    if mt and mt[1].lower() in _MONTH_NAMES:
+                        m, y = _MONTH_NAMES[mt[1].lower()], int(mt[3])
+                        d = int(mt[2]) if mt[2] else None
+                    else:
+                        mt = re.fullmatch(r'(\d{4})\s+([A-Za-z]{3,9})', v)                  # 2028 Jul
+                        if mt and mt[2].lower() in _MONTH_NAMES:
+                            y, m = int(mt[1]), _MONTH_NAMES[mt[2].lower()]
+    if y is None or m is None:
+        return None, False
+    if y < 100:
+        y += 2000
+    if not (1 <= m <= 12) or not (2000 <= y <= 2100):
+        return None, False
+    last = calendar.monthrange(y, m)[1]
+    if d is None:
+        return datetime(y, m, last), True
+    if not (1 <= d <= last):
+        return None, False
+    return datetime(y, m, d), False
+
+
+
 def lotkey(brand, lot):
     """Same normalization build_fts.py/build_xts.py use internally, so a
     lot logged here matches the same lot's dashboard entry."""
@@ -100,6 +168,7 @@ def parse_intake_rows(rows):
             strip_type = r[COL['intake_strip_type']].strip().upper()
             if not brand or not lot or not strip_type:
                 continue
+            exp_dt, exp_month_only = parse_expiration_text(r[COL['intake_expiration']])
             qty_raw = r[COL['intake_qty']].strip()
             # A free-text cell anyone with form access can type into --
             # tolerate "inf"/"nan"/absurd numbers (float() parses all of
@@ -114,7 +183,7 @@ def parse_intake_rows(rows):
             intake.append({
                 'dt': dt, 'name': name, 'strip_type': strip_type,
                 'brand': brand, 'lot': fix_numeric_id(lot),
-                'expiration': excel_serial_to_dt(r[COL['intake_expiration']]),
+                'expiration': exp_dt, 'expiration_month_only': exp_month_only,
                 'date_received': excel_serial_to_dt(r[COL['intake_date_received']]),
                 'qty': qty,
                 'notes': sanitize_text(r[COL['intake_notes']]) if len(r) > COL['intake_notes'] else '',
@@ -210,6 +279,7 @@ def group_intake_by_lot(intake_events):
             # than once for the same lot (e.g. a correction) -- same
             # "trust the latest entry" convention as `notes` above.
             'expiration': next((e['expiration'].strftime('%Y-%m-%d') for e in reversed(events) if e['expiration']), None),
+            'expiration_month_only': next((e['expiration_month_only'] for e in reversed(events) if e['expiration']), False),
         }
     return out
 
@@ -331,9 +401,16 @@ def merge_lots(intake_by_lot, dashboards):
         # differently) stays visible instead of silently picked between --
         # see Data-Sources.md's tracked "mistyped expiration dates" issue.
         intake_expiration = intake['expiration'] if intake else None
+        exp_month_only = bool(intake and intake.get('expiration_month_only') and intake_expiration)
         dash_expirations = sorted({
             e for e in (_parse_dashboard_expiration(s) for s in (d.get('expirations') or [])) if e
         })
+        if exp_month_only:
+            # A tester's exact date in the same month refines a month-only intake
+            # entry, and must not be reported as a disagreement with it.
+            same_month = [e for e in dash_expirations if e[:7] == intake_expiration[:7]]
+            if same_month:
+                intake_expiration, exp_month_only = same_month[0], False
         all_expirations = sorted(set(([intake_expiration] if intake_expiration else []) + dash_expirations))
         primary_expiration = intake_expiration or (all_expirations[0] if all_expirations else None)
 
@@ -346,6 +423,7 @@ def merge_lots(intake_by_lot, dashboards):
             'total_qty': intake['total_qty'] if intake else None,
             'intake_notes': intake['notes'] if intake else '',
             'expiration': primary_expiration, 'expiration_all': all_expirations,
+            'expiration_month_only': bool(exp_month_only and primary_expiration == intake_expiration),
             'n_submissions': d.get('n_submissions', 0),
             'first_submitted': d.get('first_submitted'), 'last_submitted': d.get('last_submitted'),
             'complete': completion['complete'] if completion else None,
