@@ -159,7 +159,7 @@
       <option value="incomplete_first">Sort: incomplete first</option>
       <option value="az">Sort: brand A&ndash;Z</option>
       <option value="lot">Sort: lot number</option>
-      <option value="recent">Sort: most recently submitted</option>
+      <option value="recent">Sort: no results yet first, then most recently submitted</option>
       <optgroup label="Needs testing" id="substanceSortGroup"></optgroup>
     </select>
     <div class="count" id="resultCount"></div>
@@ -283,6 +283,7 @@ const typesPresent = Object.keys(typeCounts).sort((a, b) => {
 });
 let currentStripType = typesPresent[0] || null;
 let currentView = 'lots';
+let receivedSortDir = null; // null | 'asc' | 'desc' -- sorts by date received (intake form); also overrides sortSelect when set
 let expirationSortDir = null; // null | 'asc' | 'desc' -- takes priority over sortSelect when set
 
 // The "Needs testing: <substance> (<n>)" options depend on which strip
@@ -338,7 +339,15 @@ function sortLots(list, mode){
   const arr = list.slice();
   if (mode === 'az') arr.sort((a,b) => a.brand.localeCompare(b.brand) || a.lot.localeCompare(b.lot));
   else if (mode === 'lot') arr.sort((a,b) => a.lot.localeCompare(b.lot));
-  else if (mode === 'recent') arr.sort((a,b) => (b.last_submitted||'').localeCompare(a.last_submitted||''));
+  else if (mode === 'recent') arr.sort((a,b) => {
+    // Lots with no test results yet come first: they are the ones lot checkers
+    // still need to pick up. Among those, the most recently received first;
+    // after them, lots with results, most recently submitted first.
+    const aNone = !a.last_submitted, bNone = !b.last_submitted;
+    if (aNone !== bNone) return aNone ? -1 : 1;
+    if (aNone) return (b.first_received||'').localeCompare(a.first_received||'') || a.brand.localeCompare(b.brand);
+    return b.last_submitted.localeCompare(a.last_submitted);
+  });
   else if (mode && mode.startsWith('sub:')) {
     const sub = mode.slice(4);
     arr.sort((a,b) => substanceNeedRank(a, sub) - substanceNeedRank(b, sub) || a.brand.localeCompare(b.brand));
@@ -361,6 +370,17 @@ function sortByExpiration(list, dir){
     if (!a.expiration) return 1;
     if (!b.expiration) return -1;
     return dir === 'asc' ? a.expiration.localeCompare(b.expiration) : b.expiration.localeCompare(a.expiration);
+  });
+  return arr;
+}
+
+function sortByReceived(list, dir){
+  const arr = list.slice();
+  arr.sort((a,b) => {
+    if (!a.first_received && !b.first_received) return 0;
+    if (!a.first_received) return 1;   // lots with no logged receipt date always last
+    if (!b.first_received) return -1;
+    return dir === 'asc' ? a.first_received.localeCompare(b.first_received) : b.first_received.localeCompare(a.first_received);
   });
   return arr;
 }
@@ -431,7 +451,9 @@ function renderLots(){
   let list = typeLots.filter(l => !q || lotSearchText(l).includes(q));
   if (filter) list = list.filter(l => lotStatusKey(l) === filter);
   if (expFilter) list = list.filter(l => expirationFilterMatch(l, expFilter));
-  list = expirationSortDir ? sortByExpiration(list, expirationSortDir) : sortLots(list, sortMode);
+  list = expirationSortDir ? sortByExpiration(list, expirationSortDir)
+       : receivedSortDir ? sortByReceived(list, receivedSortDir)
+       : sortLots(list, sortMode);
 
   document.getElementById('resultCount').textContent = `${list.length} of ${typeLots.length} ${esc(currentStripType)} lots`;
 
@@ -440,11 +462,13 @@ function renderLots(){
     table.innerHTML = `<tbody><tr><td class="empty-state" colspan="10">No lots match this search/filter.</td></tr></tbody>`;
     return;
   }
+  const recArrow = receivedSortDir === 'asc' ? '&uarr;' : receivedSortDir === 'desc' ? '&darr;' : '&udarr;';
   const expArrow = expirationSortDir === 'asc' ? '&uarr;' : expirationSortDir === 'desc' ? '&darr;' : '&udarr;';
   const thead = `
     <thead><tr>
       <th>Brand</th><th>Lot</th><th>Status</th><th>Target(s)</th><th>True negative</th>
-      <th>Interferences</th><th>Photos</th><th>Received</th>
+      <th>Interferences</th><th>Photos</th>
+      <th class="sortable-th${receivedSortDir ? ' active' : ''}" id="receivedHeader" title="Sort by date received">Received <span class="arrow">${recArrow}</span></th>
       <th class="sortable-th${expirationSortDir ? ' active' : ''}" id="expirationHeader" title="Sort by expiration date">Expiration <span class="arrow">${expArrow}</span></th>
       <th></th>
     </tr></thead>
@@ -488,6 +512,12 @@ function renderLots(){
   });
   document.getElementById('expirationHeader').addEventListener('click', () => {
     expirationSortDir = expirationSortDir === null ? 'asc' : expirationSortDir === 'asc' ? 'desc' : null;
+    receivedSortDir = null;
+    renderLots();
+  });
+  document.getElementById('receivedHeader').addEventListener('click', () => {
+    receivedSortDir = receivedSortDir === null ? 'desc' : receivedSortDir === 'desc' ? 'asc' : null;
+    expirationSortDir = null;
     renderLots();
   });
 }
@@ -621,6 +651,7 @@ function renderBolo(){
 // keep overriding whatever the dropdown says.
 document.getElementById('sortSelect').addEventListener('change', () => {
   expirationSortDir = null;
+  receivedSortDir = null;
   renderLots();
 });
 

@@ -10,6 +10,7 @@ import base64
 import json
 import re
 import shutil
+import struct
 import subprocess
 import zipfile
 from datetime import datetime, timedelta
@@ -156,6 +157,85 @@ def sanitize_text(s, max_len=800):
 # a Linux cloud sandbox where `sips` doesn't exist)
 # ---------------------------------------------------------------------------
 
+# JPEG segments dropped from every published photo: APP1 (EXIF incl. GPS,
+# device model, timestamps, embedded thumbnail; also XMP), APP3-APP13 (IPTC
+# and vendor blocks) and COM comments. Kept: JFIF (APP0), ICC colour profile
+# (APP2), Adobe (APP14) and all the structural segments the image needs.
+_JPEG_DROP = {0xE1} | set(range(0xE3, 0xEE)) | {0xEF, 0xFE}
+
+
+def _exif_orientation(exif_payload):
+    """Read the Orientation tag (0x0112) from an EXIF APP1 payload (the bytes
+    after the 6-byte 'Exif' header), or None. Needed so stripping EXIF does not
+    leave a phone photo displaying sideways when the resize tool kept the tag
+    rather than rotating the pixels."""
+    t = exif_payload
+    if len(t) < 8:
+        return None
+    bo = '<' if t[:2] == b'II' else '>' if t[:2] == b'MM' else None
+    if bo is None:
+        return None
+    off = struct.unpack(bo + 'I', t[4:8])[0]
+    if off + 2 > len(t):
+        return None
+    n = struct.unpack(bo + 'H', t[off:off + 2])[0]
+    for k in range(n):
+        e = t[off + 2 + 12 * k: off + 14 + 12 * k]
+        if len(e) < 12:
+            break
+        tag = struct.unpack(bo + 'H', e[:2])[0]
+        if tag == 0x0112:
+            return struct.unpack(bo + 'H', e[8:10])[0]
+    return None
+
+
+def strip_jpeg_metadata(path):
+    """Rewrite a JPEG in place without EXIF/GPS/XMP/IPTC/comment segments,
+    losslessly (the compressed image data is copied byte for byte). If the
+    photo carried a non-default orientation, a minimal EXIF block holding only
+    that one number is written back so it still displays upright. Every photo
+    that goes on a public page must pass through this: resizing or
+    re-encoding alone does not remove metadata."""
+    with open(path, 'rb') as f:
+        data = f.read()
+    if data[:2] != b'\xff\xd8':
+        raise RuntimeError(f'{path} is not a JPEG; cannot strip metadata')
+    kept = bytearray()
+    orientation = None
+    i = 2
+    while i + 4 <= len(data):
+        if data[i] != 0xFF:
+            kept += data[i:]          # malformed tail: copy unchanged rather than guess
+            break
+        marker = data[i + 1]
+        if marker == 0xFF:            # fill byte
+            i += 1
+            continue
+        if marker == 0xDA:            # start of scan: the rest is compressed data
+            kept += data[i:]
+            break
+        if marker == 0x01 or 0xD0 <= marker <= 0xD9:   # standalone markers, no length field
+            kept += data[i:i + 2]
+            i += 2
+            continue
+        length = struct.unpack('>H', data[i + 2:i + 4])[0]
+        seg = data[i:i + 2 + length]
+        if marker == 0xE1 and seg[4:10] == b'Exif\x00\x00':
+            orientation = _exif_orientation(seg[10:])
+        if marker not in _JPEG_DROP:
+            kept += seg
+        i += 2 + length
+    out = bytearray(b'\xff\xd8')
+    if orientation and 2 <= orientation <= 8:
+        payload = (b'Exif\x00\x00' + b'MM\x00\x2a' + struct.pack('>I', 8) + struct.pack('>H', 1)
+                   + struct.pack('>HHI', 0x0112, 3, 1) + struct.pack('>HH', orientation, 0)
+                   + struct.pack('>I', 0))
+        out += b'\xff\xe1' + struct.pack('>H', len(payload) + 2) + payload
+    out += kept
+    with open(path, 'wb') as f:
+        f.write(out)
+
+
 def process_photo(raw_path, out_jpg_path, max_dim=480, quality=45):
     """Convert/resize a downloaded photo (HEIC/JPEG/PNG/...) to a small JPEG
     and return its base64 string. Raises on failure — the caller should
@@ -175,16 +255,18 @@ def _process_photo_sips(raw_path, out_jpg_path, max_dim, quality):
     if r.returncode != 0:
         raise RuntimeError(f'sips failed on {raw_path}: {r.stderr[:300]}')
     subprocess.run(['sips', '-s', 'formatOptions', str(quality), out_jpg_path], capture_output=True, text=True)
+    strip_jpeg_metadata(out_jpg_path)
     with open(out_jpg_path, 'rb') as f:
         return base64.b64encode(f.read()).decode('ascii')
 
 
 def _process_photo_imagemagick(raw_path, out_jpg_path, max_dim, quality):
     exe = 'magick' if shutil.which('magick') else 'convert'
-    cmd = [exe, raw_path, '-auto-orient', '-resize', f'{max_dim}x{max_dim}>', '-quality', str(quality), out_jpg_path]
+    cmd = [exe, raw_path, '-auto-orient', '-strip', '-resize', f'{max_dim}x{max_dim}>', '-quality', str(quality), out_jpg_path]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f'{exe} failed on {raw_path}: {r.stderr[:300]}')
+    strip_jpeg_metadata(out_jpg_path)
     with open(out_jpg_path, 'rb') as f:
         return base64.b64encode(f.read()).decode('ascii')
 
@@ -199,6 +281,7 @@ def _process_photo_pillow(raw_path, out_jpg_path, max_dim, quality):
     img = Image.open(raw_path).convert('RGB')
     img.thumbnail((max_dim, max_dim))
     img.save(out_jpg_path, 'JPEG', quality=quality)
+    strip_jpeg_metadata(out_jpg_path)
     with open(out_jpg_path, 'rb') as f:
         return base64.b64encode(f.read()).decode('ascii')
 
