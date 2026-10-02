@@ -22,6 +22,7 @@ import argparse
 import io
 import os
 import sys
+import time
 from pathlib import Path
 
 # Make repo root importable so we can reuse common.parse_xlsx_sheet /
@@ -58,17 +59,38 @@ def _drive_service(sa_json_path: str):
     creds = service_account.Credentials.from_service_account_file(
         sa_json_path, scopes=DRIVE_SCOPES
     )
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
+    # Default socket timeout is short enough that a slow Google export (the FTS
+    # sheet is ~5 MB) fails the whole weekly build with "read operation timed
+    # out", so give each request longer. Falls back to the library default if
+    # the httplib2 helpers are unavailable.
+    try:
+        import google_auth_httplib2  # type: ignore
+        import httplib2  # type: ignore
+        http = google_auth_httplib2.AuthorizedHttp(creds, http=httplib2.Http(timeout=300))
+        return build("drive", "v3", http=http, cache_discovery=False)
+    except ImportError:
+        return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def download_sheet_as_xlsx(drive, file_id: str, out_path: Path) -> None:
-    """Export a Google-Sheet-native file as an .xlsx blob."""
-    request = drive.files().export_media(fileId=file_id, mimeType=XLSX_MIME)
-    buf = io.BytesIO()
-    downloader = MediaIoBaseDownload(buf, request)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
+def download_sheet_as_xlsx(drive, file_id: str, out_path: Path, attempts: int = 4) -> None:
+    """Export a Google-Sheet-native file as an .xlsx blob. Retries on transient
+    network errors (timeouts, resets) with a growing pause, because one flaky
+    read otherwise fails the whole build and publishes nothing."""
+    for attempt in range(1, attempts + 1):
+        try:
+            request = drive.files().export_media(fileId=file_id, mimeType=XLSX_MIME)
+            buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            break
+        except (OSError, TimeoutError) as exc:  # includes socket timeouts and connection resets
+            if attempt == attempts:
+                raise
+            wait = 10 * attempt
+            print(f"  warn: export of {file_id} failed ({exc!r}); retry {attempt}/{attempts - 1} in {wait}s")
+            time.sleep(wait)
     out_path.write_bytes(buf.getvalue())
     print(f"  wrote {out_path} ({out_path.stat().st_size:,} bytes)")
 
