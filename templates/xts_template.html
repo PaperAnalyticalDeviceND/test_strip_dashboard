@@ -274,6 +274,8 @@
 
   .empty-state{padding:40px; text-align:center; color:var(--ink-3); font-size:13px;}
 
+  /* On a phone the pinned controls bar (tabs + search + sort) is about a fifth of the screen. */
+  @media (max-width:640px){ .toolbar{ position:static; } }
   @media (max-width:640px){
     .stat-row{grid-template-columns:1fr;}
     .water-compare{grid-template-columns:1fr;}

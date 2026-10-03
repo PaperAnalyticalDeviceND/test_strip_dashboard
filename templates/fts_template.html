@@ -197,8 +197,18 @@
   .photo-badge{
     font-size:10.5px; color:var(--ink-3); font-family:var(--font-mono); white-space:nowrap;
   }
-  .metric-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .metric .mlabel{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); margin-bottom:5px;}
+  .metric-row{display:grid; grid-template-columns:1fr 1fr; gap:0 10px;}
+  /* Each metric is label / value / bar. Letting both metrics share the same three grid rows
+     (subgrid) keeps the values and bars lined up even when one label wraps onto more lines
+     than the other, e.g. on a small phone. Older browsers without subgrid fall back to the
+     fixed two-line label height below. */
+  .metric{display:block;}
+  @supports (grid-template-rows: subgrid){
+    .metric{display:grid; grid-row:span 3; grid-template-rows:subgrid;}
+    .metric .mlabel{min-height:0;}
+  }
+  @media (max-width:360px){ .metric .mlabel{font-size:9.5px; letter-spacing:.03em;} }
+  .metric .mlabel{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); margin-bottom:5px; min-height:2.6em; line-height:1.3;}
   .metric .mval{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:20px; font-weight:600;}
   .bar-track{height:5px; background:var(--surface-3); border-radius:3px; margin-top:6px; overflow:hidden;}
   .bar-fill{height:100%; border-radius:3px;}
@@ -363,9 +373,18 @@
 
   .empty-state{padding:40px; text-align:center; color:var(--ink-3); font-size:13px;}
 
+  /* On a phone the pinned controls bar (tabs + search + sort) is about a fifth of the screen. */
+  @media (max-width:640px){ .toolbar{ position:static; } }
   @media (max-width:640px){
     .stat-row{grid-template-columns:1fr 1fr;}
     .drawer-metrics{grid-template-columns:1fr 1fr;}
+    .drawer-metrics .stat:last-child{grid-column:1 / -1;}
+    .drawer-metrics .label{min-height:3.9em; line-height:1.3;}
+    .drawer-backdrop{padding:3vh 10px;}
+    .drawer, .drawer.high-volume{padding:18px 14px 20px;}
+    .drawer-sub-table{font-size:12px;}
+    .drawer-sub-table th, .drawer-sub-table td{padding:6px 4px;}
+    .interferent-list .irow{flex-direction:column; gap:2px;}
     .masthead{flex-direction:column; align-items:flex-start;}
     .masthead-right{text-align:left;}
   }
@@ -710,12 +729,12 @@ function lotCardHTML(l, sortMode){
       </div>
       <div class="metric-row">
         <div class="metric">
-          <div class="mlabel">True positive 200 ng/mL fentanyl</div>
+          <div class="mlabel">True positive<br>200 ng/mL fentanyl</div>
           <div class="mval status-${fs}">${fmtPct(l.fen_rate)} <small style="font-size:11px;color:var(--ink-3)">(${l.fen_pos}/${l.fen_run})</small></div>
           <div class="bar-track"><div class="bar-fill fill-${fs}" style="width:${l.fen_rate??0}%"></div></div>
         </div>
         <div class="metric">
-          <div class="mlabel">True negative DI water</div>
+          <div class="mlabel">True negative<br>DI water</div>
           <div class="mval status-${ws}">${fmtPct(l.wat_rate)} <small style="font-size:11px;color:var(--ink-3)">(${l.wat_true_neg}/${l.wat_run})</small></div>
           <div class="bar-track"><div class="bar-fill fill-${ws}" style="width:${l.wat_rate??0}%"></div></div>
         </div>
@@ -886,8 +905,8 @@ function openDrawer(key){
     </div>
     <p class="drawer-summary">${lotSummary(l)}</p>
     <div class="drawer-metrics">
-      <div class="stat"><div class="label">True positive 200 ng/mL fentanyl</div><div class="value status-${fs}">${fmtPct(l.fen_rate)}</div><div class="foot">${l.fen_pos}/${l.fen_run} replicates</div></div>
-      <div class="stat"><div class="label">True negative DI water</div><div class="value status-${ws}">${fmtPct(l.wat_rate)}</div><div class="foot">${l.wat_true_neg}/${l.wat_run} replicates</div></div>
+      <div class="stat"><div class="label">True positive<br>200 ng/mL fentanyl</div><div class="value status-${fs}">${fmtPct(l.fen_rate)}</div><div class="foot">${l.fen_pos}/${l.fen_run} replicates</div></div>
+      <div class="stat"><div class="label">True negative<br>DI water</div><div class="value status-${ws}">${fmtPct(l.wat_rate)}</div><div class="foot">${l.wat_true_neg}/${l.wat_run} replicates</div></div>
       <div class="stat"><div class="label">Submissions</div><div class="value">${l.n_submissions}</div><div class="foot">${l.testers.length} tester${l.testers.length>1?'s':''}</div></div>
     </div>
     <h3>Known interferents</h3>
