@@ -274,6 +274,38 @@
 
   .empty-state{padding:40px; text-align:center; color:var(--ink-3); font-size:13px;}
 
+  /* ---------- "at a glance" summary band (plain-language overview above the stats) ---------- */
+  .glance{margin:0 0 22px;}
+  .glance-verdict{
+    display:flex; align-items:center; gap:18px; padding:20px 22px;
+    background:linear-gradient(135deg, var(--glance-tint, var(--warn-tint)), var(--surface) 75%);
+    border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow);
+  }
+  .glance-badge{
+    width:54px; height:54px; border-radius:50%; background:var(--glance-color, var(--warn)); color:var(--surface);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .glance-badge svg{width:26px; height:26px;}
+  .glance-verdict h2{font-family:var(--font-display); font-size:21px; font-weight:600; margin:0 0 3px; color:var(--ink);}
+  .glance-verdict p{margin:0; color:var(--ink-2); font-size:14px; max-width:60ch;}
+  .glance-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .glance-chip{
+    display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border);
+    border-radius:999px; padding:7px 14px 7px 8px; font:inherit; font-size:13px; color:var(--ink); text-align:left;
+  }
+  button.glance-chip{cursor:pointer;}
+  button.glance-chip:hover{border-color:var(--accent);}
+  .glance-chip .gi{
+    width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    background:var(--chip-tint); color:var(--chip-color);
+  }
+  .glance-chip .gi svg{width:14px; height:14px;}
+  @media (max-width:640px){
+    .glance-verdict{padding:16px; gap:14px; align-items:flex-start;}
+    .glance-badge{width:44px; height:44px;} .glance-badge svg{width:22px; height:22px;}
+    .glance-verdict h2{font-size:18px;}
+    .glance-chip{border-radius:14px; width:100%;}
+  }
   /* On a phone the pinned controls bar (tabs + search + sort) is about a fifth of the screen. */
   @media (max-width:640px){ .toolbar{ position:static; } }
   @media (max-width:640px){
@@ -307,12 +339,14 @@
     </div>
   </header>
 
+  <section class="glance" id="glance" aria-label="Summary"></section>
+
   <div class="stat-row" id="statRow"></div>
 
   <div class="water-panel">
     <div class="water-panel-head">
       <h2>Detection of xylazine</h2>
-      <div class="note">DI (deionized) water has very low ion content; our tap water is high in calcium and magnesium ions, which can interfere with lateral-flow strip chemistry. Comparing DI vs. tap at the same concentration isolates that effect.</div>
+      <div class="note">If your tap water is &ldquo;hard&rdquo; it contains a lot of calcium and magnesium ions, which can interfere with lateral-flow strip chemistry. You may get better results by using DI (deionized) water.</div>
     </div>
     <div class="tri-legend" aria-label="Key to the result bars">
       <span><i class="seg-clear"></i>Detected (no test line)</span>
@@ -823,18 +857,21 @@ function lotSummary(l){
     if (l.tn_run) sentence += ` In plain water it read correctly ${fmtRatioPhrase(l.tn_run - l.tn_pos, l.tn_run)}.`;
   }
   const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
+  const fitSentence = lotFitForUseSentence(l);
+  if (fitSentence) sentence = fitSentence + ' ' + sentence;
+  // Keep the computed part short so the expiration warning and tester notes that
+  // follow it stay prominent. The interferent list is already shown in full
+  // right below the summary, so name at most two here and defer to it if the
+  // sentence is still long.
   if (l.interferents.length) {
-    sentence += ` Flagged by ${l.interferents.length} interferent${l.interferents.length>1?'s':''}: ${l.interferents.map(i=>i.label).join(', ')}.`;
+    const n = l.interferents.length, labels = l.interferents.map(i=>i.label);
+    const named = labels.length <= 2 ? labels.join(' and ') : labels.slice(0, 2).join(', ') + ` and ${n - 2} more`;
+    let flagged = ` Flagged by ${n} interferent${n>1?'s':''}: ${named}.`;
+    if ((sentence + flagged).trim().split(/\s+/).length > 45) flagged = ` Flagged by ${n} interferent${n>1?'s':''} (listed below).`;
+    sentence += flagged;
   } else if (totalInterferenceRuns) {
     sentence += ` No interferents detected across ${totalInterferenceRuns} replicates.`;
   }
-  const fitSentence = lotFitForUseSentence(l);
-  if (fitSentence) sentence = fitSentence + ' ' + sentence;
-  // Cap the computed-stats portion at 50 words; the expiration warning and
-  // tester notes are appended after in full, uncapped, so neither ever
-  // gets cut off mid-sentence.
-  const words = sentence.trim().split(/\s+/);
-  if (words.length > 50) sentence = words.slice(0, 50).join(' ') + '…';
   sentence += expirationClause(l);
   const notableNotes = notableNotesForLot(l);
   if (notableNotes.length) {
@@ -1129,7 +1166,59 @@ document.getElementById('viewSwitch').addEventListener('click', e => {
 document.getElementById('searchInput').addEventListener('input', renderCurrentView);
 document.getElementById('sortSelect').addEventListener('change', () => { matrixSort.code = null; renderCurrentView(); });
 
+const GLANCE_ICONS = {
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="16.8" r=".2" fill="currentColor"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><path d="M8.7 12.2 11 14.5l4.6-4.9"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r=".3" fill="currentColor"/></svg>',
+  line:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="15" rx="2.4"/><line x1="10.5" y1="7" x2="13.5" y2="7"/><line x1="10.5" y1="10.5" x2="13.5" y2="10.5" stroke-dasharray="1.2 1.6" opacity=".55"/></svg>'
+};
+const GLANCE_TONE = {good:['--good','--good-tint'], warn:['--warn','--warn-tint']};
+function inTen(frac){ return Math.round(frac * 10); }
+function glanceChip(tone, icon, text, view){
+  const [c,t] = GLANCE_TONE[tone];
+  const inner = `<span class="gi" style="--chip-color:var(${c}); --chip-tint:var(${t});">${GLANCE_ICONS[icon]}</span>${text}`;
+  return view ? `<button type="button" class="glance-chip" data-glance-view="${view}">${inner}</button>` : `<div class="glance-chip">${inner}</div>`;
+}
+function renderGlanceBand(verdict, tone, sub, chips){
+  const [c,t] = GLANCE_TONE[tone];
+  document.getElementById('glance').innerHTML = `
+    <div class="glance-verdict" style="--glance-color:var(${c}); --glance-tint:var(${t});">
+      <div class="glance-badge">${GLANCE_ICONS[tone === 'good' ? 'check' : 'warn']}</div>
+      <div><h2>${verdict}</h2><p>${sub}</p></div>
+    </div>
+    <div class="glance-chips">${chips.join('')}</div>`;
+  document.querySelectorAll('#glance [data-glance-view]').forEach(b =>
+    b.addEventListener('click', () => switchToView(b.dataset.glanceView)));
+}
+/* Plain-language overview band, computed from DATA. "Clearly detected" means no test line at all;
+   a faint line (intensity 1-3) is inconclusive, so it is reported separately. */
+function renderGlance(){
+  const o = DATA.overall;
+  const brands = new Set(DATA.lots.map(l => l.brand)).size;
+  const di = o.pooled_2500_di_split, tap = o.pooled_2500_tap_split, low = o.pooled_1000_di_split;
+  const all = [di, tap, low];
+  const run = all.reduce((a,s) => a + s[3], 0);
+  if (!run) return;
+  const strong = (di[0] + tap[0]) / (di[3] + tap[3]);
+  const lowShare = low[0] / low[3];
+  const faintPct = Math.round(100 * all.reduce((a,s) => a + s[1], 0) / run);
+  const counts = {};
+  DATA.lots.forEach(l => l.interferents.forEach(i => counts[i.label] = (counts[i.label]||0) + 1));
+  const top = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0, 3).map(e => e[0]);
+  let verdict, tone = 'warn';
+  if (strong >= 0.9) { verdict = 'Works well.'; tone = 'good'; }
+  else if (strong >= 0.5) verdict = 'Works, but faint lines are common.';
+  else verdict = 'Often hard to read.';
+  const spec = o.pooled_water_specificity;
+  const chips = [];
+  if (spec !== null && spec >= 95) chips.push(glanceChip('good','check','Rarely wrong about &ldquo;no xylazine&rdquo;'));
+  chips.push(glanceChip(strong >= 0.9 ? 'good' : 'warn','target',`Clear &ldquo;xylazine&rdquo; answer in about ${inTen(strong)} of 10 tests at 2,500 ng/mL and ${inTen(lowShare)} of 10 at 1,000 ng/mL`));
+  if (faintPct >= 5) chips.push(glanceChip('warn','line',`About ${faintPct}% of tests gave a faint line that is hard to call`));
+  if (top.length) chips.push(glanceChip('warn','warn',`Similar medicines (${top.map(t => t.toLowerCase()).join(', ')}) can trigger it`,'matrix'));
+  renderGlanceBand(verdict, tone, `Here&rsquo;s what our lab found after testing ${o.n_lots} batches of xylazine strips from ${brands} companies.`, chips);
+}
 renderStats();
+renderGlance();
 
 // Deep link support: a URL like "xts.html#view=matrix" opens straight into
 // the Interference matrix tab (or "log" / "lots") instead of always

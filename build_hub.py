@@ -20,6 +20,7 @@ __HUB_VERSION_NOTE__ footer placeholder as the hub, for a consistent
 "last updated" date across every page this script writes.
 """
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -48,6 +49,31 @@ def xts_faint_pct(xts):
     return f"{100 * sum(p[1] for p in parts) / sum(p[3] for p in parts):.0f}"
 
 
+INTERFERENT_ALIAS = {'Diphenhydramine': 'diphenhydramine (Benadryl)'}
+
+
+def _top_interferents(data, k):
+    """Labels of the substances flagging the most lots, most-flagging first."""
+    counts = {}
+    for lot in data['lots']:
+        for i in lot['interferents']:
+            counts[i['label']] = counts.get(i['label'], 0) + 1
+    return [lab for lab, _ in sorted(counts.items(), key=lambda kv: -kv[1])[:k]], counts
+
+
+def _join(names):
+    return ', '.join(names[:-1]) + ' and ' + names[-1] if len(names) > 1 else names[0]
+
+
+def _faint_photo():
+    """The faint-line example photo already embedded in xts_template.html (INC_PHOTO),
+    reused for the landing page's hover preview so there is one copy of the image."""
+    m = re.search(r'const INC_PHOTO = "(data:image/[^"]+)"', open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', 'xts_template.html'), encoding='utf-8').read())
+    if not m:
+        raise RuntimeError('could not find INC_PHOTO in xts_template.html')
+    return m.group(1)
+
+
 def main():
     if len(sys.argv) != 8:
         print(__doc__)
@@ -55,8 +81,17 @@ def main():
     (fts_path, xts_path, progress_path, template_path, out_path,
      methodology_template_path, methodology_out_path) = sys.argv[1:8]
 
-    fts = extract_overall(fts_path)
-    xts = extract_overall(xts_path)
+    fts_data = extract_dashboard_data(fts_path)
+    xts_data = extract_dashboard_data(xts_path)
+    fts, xts = fts_data['overall'], xts_data['overall']
+    fts_brands = len({l['brand'] for l in fts_data['lots']})
+    xts_brands = len({l['brand'] for l in xts_data['lots']})
+    fts_top, fts_counts = _top_interferents(fts_data, 1)
+    xts_top, _ = _top_interferents(xts_data, 3)
+    fts_perfect = sum(1 for l in fts_data['lots']
+                      if l['fen_run'] and l['fen_rate'] == 100 and l['wat_run'] and l['wat_true_neg'] == l['wat_run'])
+    xts_strong = [_xts_split(xts, k) for k in ('2500_di', '2500_tap')]
+    xts_strong_frac = sum(p[0] for p in xts_strong) / sum(p[3] for p in xts_strong)
     progress = extract_overall(progress_path)
 
     version_note = f"Dashboard v{DASHBOARD_VERSION} &middot; updated {datetime.now().strftime('%B %-d, %Y')}"
@@ -73,6 +108,19 @@ def main():
         '__XTS_DI_RATE__': xts_clear_pct(xts, '2500_di'),
         '__XTS_TAP_RATE__': xts_clear_pct(xts, '2500_tap'),
         '__XTS_FAINT_RATE__': xts_faint_pct(xts),
+        # Landing-page story ("What we've found so far"); all figures come from the dashboards' own data.
+        '__STORY_FTS_BRANDS__': str(fts_brands),
+        '__STORY_XTS_BRANDS__': str(xts_brands),
+        '__STORY_REPORTS__': str(fts['n_submissions'] + xts['n_submissions']),
+        '__STORY_FTS_IN10__': str(round(fts['pooled_fen_rate'] / 10)),
+        '__STORY_FTS_WATER__': f"{fts['pooled_wat_rate']:.1f}",
+        '__STORY_XTS_IN10__': str(round(xts_strong_frac * 10)),
+        '__STORY_XTS_FAINT__': xts_faint_pct(xts),
+        '__STORY_FTS_TOP_INTERFERENT__': INTERFERENT_ALIAS.get(fts_top[0], fts_top[0].lower()) if fts_top else 'other drugs',
+        '__STORY_FTS_TOP_LOTS__': str(fts_counts.get(fts_top[0], 0)) if fts_top else '0',
+        '__STORY_XTS_TOP_INTERFERENTS__': _join([n.lower() for n in xts_top]) if xts_top else 'other medicines',
+        '__STORY_FTS_PERFECT__': str(fts_perfect),
+        '__FAINT_PHOTO__': _faint_photo(),
         '__PROGRESS_LOTS__': str(progress['n_lots']),
         '__PROGRESS_COMPLETE__': str(progress['n_complete']),
         '__PROGRESS_BOLO__': str(progress['n_bolo']),

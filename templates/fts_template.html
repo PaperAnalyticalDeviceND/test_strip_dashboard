@@ -373,6 +373,38 @@
 
   .empty-state{padding:40px; text-align:center; color:var(--ink-3); font-size:13px;}
 
+  /* ---------- "at a glance" summary band (plain-language overview above the stats) ---------- */
+  .glance{margin:0 0 22px;}
+  .glance-verdict{
+    display:flex; align-items:center; gap:18px; padding:20px 22px;
+    background:linear-gradient(135deg, var(--glance-tint, var(--warn-tint)), var(--surface) 75%);
+    border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow);
+  }
+  .glance-badge{
+    width:54px; height:54px; border-radius:50%; background:var(--glance-color, var(--warn)); color:var(--surface);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .glance-badge svg{width:26px; height:26px;}
+  .glance-verdict h2{font-family:var(--font-display); font-size:21px; font-weight:600; margin:0 0 3px; color:var(--ink);}
+  .glance-verdict p{margin:0; color:var(--ink-2); font-size:14px; max-width:60ch;}
+  .glance-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .glance-chip{
+    display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border);
+    border-radius:999px; padding:7px 14px 7px 8px; font:inherit; font-size:13px; color:var(--ink); text-align:left;
+  }
+  button.glance-chip{cursor:pointer;}
+  button.glance-chip:hover{border-color:var(--accent);}
+  .glance-chip .gi{
+    width:24px; height:24px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    background:var(--chip-tint); color:var(--chip-color);
+  }
+  .glance-chip .gi svg{width:14px; height:14px;}
+  @media (max-width:640px){
+    .glance-verdict{padding:16px; gap:14px; align-items:flex-start;}
+    .glance-badge{width:44px; height:44px;} .glance-badge svg{width:22px; height:22px;}
+    .glance-verdict h2{font-size:18px;}
+    .glance-chip{border-radius:14px; width:100%;}
+  }
   /* On a phone the pinned controls bar (tabs + search + sort) is about a fifth of the screen. */
   @media (max-width:640px){ .toolbar{ position:static; } }
   @media (max-width:640px){
@@ -410,6 +442,8 @@
       <div id="submissionCountLine">computed live from raw submissions</div>
     </div>
   </header>
+
+  <section class="glance" id="glance" aria-label="Summary"></section>
 
   <div class="stat-row" id="statRow"></div>
 
@@ -849,18 +883,21 @@ function lotSummary(l){
     sentence = parts.length ? ('This lot ' + parts.join('; ') + '.') : 'No test results recorded yet for this lot.';
   }
   const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
+  const fitSentence = lotFitForUseSentence(l);
+  if (fitSentence) sentence = fitSentence + ' ' + sentence;
+  // Keep the computed part short so the expiration warning and tester notes that
+  // follow it stay prominent. The interferent list is already shown in full
+  // right below the summary, so name at most two here and defer to it if the
+  // sentence is still long.
   if (l.interferents.length) {
-    sentence += ` Flagged by ${l.interferents.length} interferent${l.interferents.length>1?'s':''}: ${l.interferents.map(i=>i.label).join(', ')}.`;
+    const n = l.interferents.length, labels = l.interferents.map(i=>i.label);
+    const named = labels.length <= 2 ? labels.join(' and ') : labels.slice(0, 2).join(', ') + ` and ${n - 2} more`;
+    let flagged = ` Flagged by ${n} interferent${n>1?'s':''}: ${named}.`;
+    if ((sentence + flagged).trim().split(/\s+/).length > 45) flagged = ` Flagged by ${n} interferent${n>1?'s':''} (listed below).`;
+    sentence += flagged;
   } else if (totalInterferenceRuns) {
     sentence += ` No interferents detected across ${totalInterferenceRuns} replicates.`;
   }
-  const fitSentence = lotFitForUseSentence(l);
-  if (fitSentence) sentence = fitSentence + ' ' + sentence;
-  // Cap the computed-stats portion at 50 words; the expiration warning and
-  // tester notes are appended after in full, uncapped, so neither ever
-  // gets cut off mid-sentence.
-  const words = sentence.trim().split(/\s+/);
-  if (words.length > 50) sentence = words.slice(0, 50).join(' ') + '…';
   sentence += expirationClause(l);
   const notableNotes = notableNotesForLot(l);
   if (notableNotes.length) {
@@ -1152,7 +1189,55 @@ document.getElementById('viewSwitch').addEventListener('click', e => {
 document.getElementById('searchInput').addEventListener('input', renderCurrentView);
 document.getElementById('sortSelect').addEventListener('change', () => { matrixSort.code = null; renderCurrentView(); });
 
+const GLANCE_ICONS = {
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="16.8" r=".2" fill="currentColor"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><path d="M8.7 12.2 11 14.5l4.6-4.9"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.3"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r=".3" fill="currentColor"/></svg>',
+  line:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="15" rx="2.4"/><line x1="10.5" y1="7" x2="13.5" y2="7"/><line x1="10.5" y1="10.5" x2="13.5" y2="10.5" stroke-dasharray="1.2 1.6" opacity=".55"/></svg>'
+};
+const GLANCE_TONE = {good:['--good','--good-tint'], warn:['--warn','--warn-tint']};
+function inTen(frac){ return Math.round(frac * 10); }
+function glanceChip(tone, icon, text, view){
+  const [c,t] = GLANCE_TONE[tone];
+  const inner = `<span class="gi" style="--chip-color:var(${c}); --chip-tint:var(${t});">${GLANCE_ICONS[icon]}</span>${text}`;
+  return view ? `<button type="button" class="glance-chip" data-glance-view="${view}">${inner}</button>` : `<div class="glance-chip">${inner}</div>`;
+}
+function renderGlanceBand(verdict, tone, sub, chips){
+  const [c,t] = GLANCE_TONE[tone];
+  document.getElementById('glance').innerHTML = `
+    <div class="glance-verdict" style="--glance-color:var(${c}); --glance-tint:var(${t});">
+      <div class="glance-badge">${GLANCE_ICONS[tone === 'good' ? 'check' : 'warn']}</div>
+      <div><h2>${verdict}</h2><p>${sub}</p></div>
+    </div>
+    <div class="glance-chips">${chips.join('')}</div>`;
+  document.querySelectorAll('#glance [data-glance-view]').forEach(b =>
+    b.addEventListener('click', () => switchToView(b.dataset.glanceView)));
+}
+/* Plain-language overview band. Everything here is computed from DATA, so the wording tracks the
+   numbers; the verdict thresholds are deliberately coarse. */
+function renderGlance(){
+  const o = DATA.overall;
+  const brands = new Set(DATA.lots.map(l => l.brand)).size;
+  const det = o.pooled_fen_rate, wat = o.pooled_wat_rate;
+  if (det === null || wat === null) return;
+  const ALIAS = {Diphenhydramine:'Diphenhydramine (Benadryl)'};
+  const counts = {};
+  DATA.lots.forEach(l => l.interferents.forEach(i => counts[i.label] = (counts[i.label]||0) + 1));
+  const top = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
+  let verdict, tone = 'warn';
+  if (det >= 90 && wat >= 99) { verdict = 'Works well.'; tone = 'good'; }
+  else if (det >= 70) verdict = 'Works well. Not perfectly.';
+  else verdict = 'Mixed results.';
+  const chips = [
+    wat >= 99 ? glanceChip('good','check','Rarely wrong about &ldquo;no fentanyl&rdquo;')
+              : glanceChip('warn','warn','Sometimes reads plain water as fentanyl'),
+    glanceChip(det >= 90 ? 'good' : 'warn','target',`Finds real fentanyl about ${inTen(det/100)} in 10 times`)
+  ];
+  if (top) chips.push(glanceChip('warn','warn',`Watch out for ${ALIAS[top[0]] || top[0]} &mdash; it can trick some strips`,'matrix'));
+  renderGlanceBand(verdict, tone, `Here&rsquo;s what our lab found after testing ${o.n_lots} batches of fentanyl strips from ${brands} companies.`, chips);
+}
 renderStats();
+renderGlance();
 
 // Deep link support: a URL like "fts.html#view=matrix" opens straight into
 // the Interference matrix tab (or "log" / "lots") instead of always

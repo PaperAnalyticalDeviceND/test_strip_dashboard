@@ -102,6 +102,52 @@
   .card.planned{opacity:.7;cursor:default;}
   .card.planned .cta{color:var(--ink-3);}
 
+  /* ---------- "what we've found so far" guided story ---------- */
+  .story{display:flex;flex-direction:column;}
+  .beat{display:flex;gap:16px;}
+  .beat-rail{display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;}
+  .beat-dot{
+    width:40px;height:40px;border-radius:50%;background:var(--surface);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;color:var(--beat-color,var(--accent));flex-shrink:0;
+  }
+  .beat-dot svg{width:20px;height:20px;}
+  .beat-track{flex:1;width:2px;background:var(--border);margin:6px 0;min-height:30px;}
+  .beat-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:16px 20px;flex:1;margin-bottom:16px;min-width:0;
+  }
+  .beat:last-child .beat-card{margin-bottom:0;}
+  .beat-card h3{margin:0 0 6px;}
+  .beat-card p{font-size:.95rem;max-width:62ch;}
+  .beat-card p:last-child{margin-bottom:0;}
+  .beat-card p strong{color:var(--ink);}
+  .beat-card p a{color:var(--accent);}
+  .beat-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .beat-btn{
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+    font-family:var(--font-mono);font-size:12px;color:var(--accent);
+    background:var(--accent-tint);border:1px solid var(--accent-tint-border);border-radius:6px;padding:6px 12px;
+  }
+  .beat-btn:hover{border-color:var(--accent);}
+  .barriers{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:14px;}
+  .barriers li{position:relative;}
+  .barriers p{margin:0;}
+  .beat-card .coda{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--border);font-size:.9rem;color:var(--ink-3);}
+  .peek{color:var(--accent);font-weight:600;cursor:help;text-decoration:underline dotted;text-underline-offset:3px;}
+  .peek:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px;}
+  .peek-pop{
+    display:none;position:absolute;z-index:10;left:0;right:0;top:calc(100% + 6px);max-width:440px;
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;
+    box-shadow:0 14px 34px -14px rgba(0,0,0,.4);font-weight:400;
+  }
+  .peek:hover .peek-pop,.peek:focus .peek-pop{display:block;}
+  .peek-pop img{display:block;width:100%;height:auto;border-radius:6px;}
+  .peek-cap{display:block;margin-top:8px;font-size:12px;color:var(--ink-3);}
+  @media (max-width:640px){
+    .beat{gap:10px;} .beat-rail{width:32px;} .beat-dot{width:32px;height:32px;} .beat-dot svg{width:16px;height:16px;}
+    .beat-card{padding:14px;}
+  }
+
   .footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
   @media (max-width:640px){.footer-grid{grid-template-columns:1fr;}}
   .footer-grid .card p:last-child{margin-bottom:0;}
@@ -210,6 +256,50 @@
         identity can span more than one dashboard.
       </div>
       <span class="cta">Not yet built</span>
+    </div>
+
+  </div>
+</section>
+
+<section aria-labelledby="story-h">
+  <h2 id="story-h">What we&rsquo;ve found so far</h2>
+  <div class="story">
+
+    <div class="beat">
+      <div class="beat-rail"><div class="beat-dot" style="--beat-color:var(--accent);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="9.5" width="12" height="8.5" rx="1.7"/><rect x="8" y="4.5" width="12" height="8.5" rx="1.7"/></svg></div><div class="beat-track"></div></div>
+      <div class="beat-card">
+        <h3>What we checked</h3>
+        <p>We tested <strong>__FTS_LOTS__ batches of fentanyl strips</strong> from __STORY_FTS_BRANDS__ companies and <strong>__XTS_LOTS__ batches of xylazine strips</strong> from __STORY_XTS_BRANDS__ companies. Lab members have sent in __STORY_REPORTS__ test reports so far.</p>
+        <div class="beat-links">
+          <a class="beat-btn" href="fts.html">Fentanyl results &rarr;</a>
+          <a class="beat-btn" href="xts.html">Xylazine results &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="beat-rail"><div class="beat-dot" style="--beat-color:var(--good,var(--accent));"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20 5.5v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6Z"/><path d="M8.7 12.2 11 14.5l4.6-4.9"/></svg></div><div class="beat-track"></div></div>
+      <div class="beat-card">
+        <h3>How they did</h3>
+        <p>Most of the time, the strips worked. In plain water, fentanyl strips were right __STORY_FTS_WATER__% of the time. When fentanyl was there, they found it about __STORY_FTS_IN10__ in 10 times.</p>
+        <p>Xylazine strips gave a clear answer in about __STORY_XTS_IN10__ of 10 tests. About __STORY_XTS_FAINT__% of tests gave a faint line that was too hard to call.</p>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="beat-rail"><div class="beat-dot" style="--beat-color:var(--warn);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="16.8" r=".2" fill="currentColor"/></svg></div></div>
+      <div class="beat-card">
+        <h3>Two limits worth knowing about</h3>
+        <ul class="barriers">
+          <li>
+            <p><strong>Faint test lines.</strong> At low amounts, some strips show a <span class="peek" tabindex="0" aria-describedby="peek-faint">very faint test line<span class="peek-pop" role="tooltip" id="peek-faint"><img src="__FAINT_PHOTO__" width="547" height="61" alt="A test strip with a very faint test line, marked with an arrow and the label Faint test line"><span class="peek-cap">Example of a very faint test line (see the arrow).</span></span></span>. It is easy to miss, especially in poor light. For fentanyl strips we count any visible line as a negative result. For xylazine strips we call a faint line &ldquo;inconclusive.&rdquo;</p>
+          </li>
+          <li>
+            <p><strong>False alarms from other drugs.</strong> Sometimes a strip says it found the drug when it did not. For fentanyl strips, <a href="fts.html#view=matrix">__STORY_FTS_TOP_INTERFERENT__ is the most common reason</a> (__STORY_FTS_TOP_LOTS__ of __FTS_LOTS__ batches). For xylazine strips, <a href="xts.html#view=matrix">similar medicines like __STORY_XTS_TOP_INTERFERENTS__ can do it</a>.</p>
+          </li>
+        </ul>
+        <p class="coda">Even so, __STORY_FTS_PERFECT__ of the __FTS_LOTS__ fentanyl batches found fentanyl every time and never gave a false alarm in plain water.</p>
+      </div>
     </div>
 
   </div>
