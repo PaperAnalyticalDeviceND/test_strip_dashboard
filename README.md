@@ -2,9 +2,14 @@
 
 Build pipeline for the Lieberman Lab's drug-checking test strip lot-testing
 QC dashboards (FTS/fentanyl, XTS/xylazine, and future targets), published as
-claude.ai Artifacts. Separate from `annotated_chemopad` (ChemoPAD ML/PLS
-work) — different subject, different audience, kept in its own repo on
-purpose.
+claude.ai Artifacts. A standalone project — its own subject, audience,
+repository and wiki, kept separate from the lab's other projects on purpose.
+
+**Working on it:** start Claude Code (or any coding assistant) from this
+project's own folder, never from another project's folder. The working
+directory decides which instructions, hooks, memory and saved transcripts
+apply, and it is the usual way files from one project end up in another.
+Before pushing, check `git remote -v` and `git status -sb`.
 
 ## How it fits together
 

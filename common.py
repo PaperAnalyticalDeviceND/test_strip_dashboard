@@ -27,7 +27,7 @@ NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 # after for a minor one (new filter/sort, copy edits, a bugfix). One shared
 # version for both FTS and XTS -- they're the same "lot checking dashboard"
 # project, built from this same module, and versioned separately from the
-# unrelated drug_trash_dashboard project's own counter.
+# unrelated sibling dashboard project's own counter.
 DASHBOARD_VERSION = '1.8'
 
 
