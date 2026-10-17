@@ -1,27 +1,27 @@
 {
-  "pulled_at": "2026-10-10T01:57:40Z",
+  "pulled_at": "2026-10-17T01:43:18Z",
   "period_start": "2026-08-01T00:00:00Z",
-  "period_end": "2026-10-10T01:57:35Z",
-  "total_pageviews": 312,
+  "period_end": "2026-10-17T01:43:13Z",
+  "total_pageviews": 337,
   "total_events": 66,
   "pages": [
     {
       "path": "/test_strip_dashboard",
       "title": "Lieberman Lab \u2014 Test Strip Lot Checking Program",
       "is_event": false,
-      "count": 124
+      "count": 135
     },
     {
       "path": "/test_strip_dashboard/fts.html",
       "title": "FTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 68
+      "count": 78
     },
     {
       "path": "/test_strip_dashboard/xts.html",
       "title": "XTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 48
+      "count": 52
     },
     {
       "path": "fts-view-matrix",
