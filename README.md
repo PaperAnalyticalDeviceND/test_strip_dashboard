@@ -8,9 +8,11 @@ purpose.
 
 ## How it fits together
 
-Each dashboard is a single self-contained HTML file (no server, no external
-requests — all data and photos are embedded inline as base64). Building one
-means:
+Each dashboard is a single HTML file with its data embedded (no server, no API
+calls). Photos are the one exception: each photo is processed once into a
+1200 px JPEG and published as its own file under `photos/v1/` next to the pages;
+the page embeds only a small thumbnail per photo and loads the full-size file
+when a photo is opened (see `common.prepare_photo`). Building one means:
 
 1. Download the response sheet as `.xlsx` from Google Drive (needs a live
    Drive/Sheets connector — a plain script can't do this step, only an agent

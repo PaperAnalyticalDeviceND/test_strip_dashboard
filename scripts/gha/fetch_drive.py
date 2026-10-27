@@ -30,7 +30,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from common import parse_xlsx_sheet, extract_drive_file_id  # noqa: E402
+from common import parse_xlsx_sheet, extract_drive_file_id, hosted_photo_name  # noqa: E402
 
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
@@ -136,6 +136,9 @@ def main() -> int:
                         "end up empty.")
     p.add_argument("--out-xlsx", required=True, help="Path to write the exported .xlsx")
     p.add_argument("--out-photos-dir", required=True, help="Directory to write photos into")
+    p.add_argument("--skip-hosted-dir", default=None,
+                   help="Directory of already-published hosted photos (common.HOSTED_PHOTO_SUBDIR). "
+                        "A photo whose hosted copy is there is not downloaded again.")
     p.add_argument("--sa-json", required=True, help="Path to the service-account JSON key")
     args = p.parse_args()
 
@@ -176,7 +179,13 @@ def main() -> int:
     print(f"found {len(unique_ids)} unique photo IDs; downloading")
     n_ok = 0
     n_err = 0
+    n_hosted = 0
     for i, fid in enumerate(sorted(unique_ids), start=1):
+        # Already published as a hosted photo: the build reuses that file, so the
+        # original is not needed.
+        if args.skip_hosted_dir and (Path(args.skip_hosted_dir) / hosted_photo_name(fid)).exists():
+            n_hosted += 1
+            continue
         # Skip if we already have any file starting with this id (rerun safety)
         if any(p.name.startswith(fid + ".") for p in out_photos_dir.iterdir()):
             n_ok += 1
@@ -189,7 +198,7 @@ def main() -> int:
         if i % 25 == 0:
             print(f"  … {i} / {len(unique_ids)}")
 
-    print(f"done: {n_ok} ok, {n_err} failed")
+    print(f"done: {n_ok} downloaded, {n_hosted} already hosted (skipped), {n_err} failed")
     return 0 if n_err == 0 else 0  # never fail the whole build for missing photos
 
 

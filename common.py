@@ -7,12 +7,16 @@ routine (a Claude agent, human or scheduled) is responsible for fetching the
 spreadsheet and photos via the Drive/Sheets connector first.
 """
 import base64
+import hashlib
+import os
 import json
 import re
 import shutil
 import struct
+import sys
 import subprocess
 import zipfile
+from collections import defaultdict
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
 
@@ -24,7 +28,7 @@ NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 # version for both FTS and XTS -- they're the same "lot checking dashboard"
 # project, built from this same module, and versioned separately from the
 # unrelated drug_trash_dashboard project's own counter.
-DASHBOARD_VERSION = '1.5'
+DASHBOARD_VERSION = '1.6'
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +282,8 @@ def _process_photo_pillow(raw_path, out_jpg_path, max_dim, quality):
         raise RuntimeError(
             f'no photo-processing tool available (no sips, no ImageMagick, no Pillow) for {raw_path}'
         ) from e
-    img = Image.open(raw_path).convert('RGB')
+    from PIL import ImageOps
+    img = ImageOps.exif_transpose(Image.open(raw_path)).convert('RGB')
     img.thumbnail((max_dim, max_dim))
     img.save(out_jpg_path, 'JPEG', quality=quality)
     strip_jpeg_metadata(out_jpg_path)
@@ -309,6 +314,116 @@ def reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey_fn):
         lot['n_photos'] = len(photos)
         lot['n_photos_packaging'] = sum(1 for p in photos if p.get('kind') == 'packaging')
         lot['n_photos_strip'] = sum(1 for p in photos if p.get('kind') == 'strip')
+
+
+# ---------------------------------------------------------------------------
+# Hosted photos
+# ---------------------------------------------------------------------------
+# Each photo is processed once into a 1200 px JPEG (metadata stripped) and
+# published as its own file next to the dashboards, e.g.
+#   https://padproject.info/test_strip_dashboard/photos/v1/<name>.jpg
+# The dashboard pages embed only a small thumbnail per photo and load the
+# full-size file when someone opens it. Because a hosted file never changes,
+# later builds reuse it instead of downloading and re-processing the original.
+# To change the size or quality, bump the folder name (v1 -> v2): old files stay
+# valid for old pages, and the next build regenerates everything at the new size.
+HOSTED_PHOTO_SUBDIR = 'photos/v1'
+HOSTED_PHOTO_DIM = 1200
+HOSTED_PHOTO_QUALITY = 70
+THUMB_DIM = 320
+THUMB_QUALITY = 50
+
+
+def hosted_photo_name(drive_id):
+    """Published file name for a Drive file. A hash rather than the Drive ID itself,
+    so the public site never lists the IDs of the lab's Drive files."""
+    return hashlib.sha256(drive_id.encode('utf-8')).hexdigest()[:24] + '.jpg'
+
+
+def prepare_photo(drive_id, raw_dir, hosted_dir):
+    """Make sure the hosted copy of a photo exists and return what the page needs.
+
+    Returns {'h': <hosted file name>, 'thumb': <base64 thumbnail>, 'sha': <hash of
+    the hosted file>}, or None if the photo is neither already hosted nor present
+    in raw_dir. Raises if the original is present but cannot be processed.
+
+    If the hosted file already exists the original is not needed at all; the
+    thumbnail is made from the hosted file."""
+    name = hosted_photo_name(drive_id)
+    hosted_path = os.path.join(hosted_dir, name)
+    if not os.path.exists(hosted_path):
+        raw = next((f for f in sorted(os.listdir(raw_dir)) if f.startswith(drive_id + '.')), None) \
+            if os.path.isdir(raw_dir) else None
+        if raw is None:
+            return None
+        os.makedirs(hosted_dir, exist_ok=True)
+        tmp = hosted_path + '.part.jpg'
+        try:
+            process_photo(os.path.join(raw_dir, raw), tmp, HOSTED_PHOTO_DIM, HOSTED_PHOTO_QUALITY)
+            os.replace(tmp, hosted_path)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+    with open(hosted_path, 'rb') as fh:
+        sha = hashlib.sha256(fh.read()).hexdigest()
+    tmp_thumb = hosted_path + '.thumb.jpg'
+    try:
+        thumb = process_photo(hosted_path, tmp_thumb, THUMB_DIM, THUMB_QUALITY)
+    finally:
+        if os.path.exists(tmp_thumb):
+            os.remove(tmp_thumb)
+    return {'h': name, 'thumb': thumb, 'sha': sha}
+
+
+def build_photos_by_lot(records, photos_dir, hosted_dir, lotkey_fn):
+    """Photos for the dashboard's galleries, grouped by lot key.
+
+    Every record's photos are made available as hosted files in hosted_dir (see
+    prepare_photo) and each gallery entry carries only the hosted file name and a
+    small embedded thumbnail. Photos whose hosted copy already exists need no
+    original in photos_dir. Photos referenced by the sheet but found nowhere are
+    skipped with a warning; if every available original fails to process the build
+    aborts rather than publish a dashboard with no photos."""
+    photos_by_lot = {}
+    seen_hashes_by_lot = defaultdict(set)
+    missing = []
+    attempted = failed = skipped_dupes = 0
+    for r in records:
+        k = lotkey_fn(r['brand'], r['lot'])
+        for p in r['photos']:
+            fid = extract_drive_file_id(p['url'])
+            if not fid:
+                continue
+            attempted += 1
+            try:
+                prepared = prepare_photo(fid, photos_dir, hosted_dir)
+            except Exception as e:
+                failed += 1
+                print(f'WARN: photo {fid} failed to process: {e}', file=sys.stderr)
+                continue
+            if prepared is None:
+                attempted -= 1
+                missing.append(fid)
+                continue
+            if prepared['sha'] in seen_hashes_by_lot[k]:
+                skipped_dupes += 1
+                continue
+            seen_hashes_by_lot[k].add(prepared['sha'])
+            photos_by_lot.setdefault(k, []).append({
+                'h': prepared['h'], 'thumb': prepared['thumb'],
+                'tester': r['name'], 'date': r['dt'].strftime('%Y-%m-%d'), 'kind': p['kind'],
+            })
+    if missing:
+        print(f'WARN: {len(missing)} photo(s) referenced in the sheet were not found in {photos_dir} or already hosted: {missing}', file=sys.stderr)
+    if skipped_dupes:
+        print(f'INFO: skipped {skipped_dupes} duplicate photo upload(s) (identical content within the same lot)', file=sys.stderr)
+    if attempted > 0 and failed == attempted:
+        raise RuntimeError(
+            f'all {attempted} photo(s) on disk failed to process (0 succeeded) - '
+            'this looks like a missing/broken image tool, not per-photo corruption; '
+            'aborting rather than publishing a dashboard with zero photos'
+        )
+    return photos_by_lot
 
 
 # ---------------------------------------------------------------------------
@@ -354,4 +469,5 @@ def inject_into_template(template_html, dashboard_data, photos_by_lot):
     photos_payload = embed_json_in_script(photos_by_lot)
     html = template_html.replace('__PHOTOS_DATA__', photos_payload, 1)
     html = html.replace('__DASHBOARD_DATA__', data_payload, 1)
+    html = html.replace('__PHOTO_BASE__', HOSTED_PHOTO_SUBDIR + '/')
     return html

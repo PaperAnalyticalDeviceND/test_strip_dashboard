@@ -2,7 +2,7 @@
 """Build the FTS (fentanyl test strip) lot-testing dashboard.
 
 Usage:
-    python3 build_fts.py <responses.xlsx> <photos_dir> <output.html>
+    python3 build_fts.py <responses.xlsx> <photos_dir> <output.html> [<hosted_photos_dir>]
 
 <photos_dir> must contain the raw downloaded bytes of every photo referenced
 in the sheet's "Photos of product & packaging" column (column M) and its
@@ -11,6 +11,11 @@ extension — sips will detect the real format).
 Photos referenced in the sheet but missing from <photos_dir> are skipped
 with a warning, not a hard failure, so a partial photo fetch still produces
 a working dashboard.
+
+Each photo is also written, once, as a 1200 px JPEG to <hosted_photos_dir> (default:
+photos/v1/ next to <output.html>) and the page embeds only a thumbnail plus that file's
+name. A photo already present in <hosted_photos_dir> is reused and its original is not
+needed. See common.prepare_photo.
 """
 import hashlib
 import json
@@ -23,8 +28,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
     parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id,
-    process_photo, extract_drive_file_id, inject_into_template,
-    reconcile_photo_counts, DASHBOARD_VERSION,
+    build_photos_by_lot, inject_into_template,
+    reconcile_photo_counts, DASHBOARD_VERSION, HOSTED_PHOTO_SUBDIR,
 )
 
 SUBSTANCES = ['DIPHEN', 'PROC', 'LIDO', 'LEVAM', 'MDONE', 'METH', 'MDMA']
@@ -208,60 +213,12 @@ def build_dashboard_data(records):
     return {'dashboard_version': DASHBOARD_VERSION, 'overall': overall, 'lots': lot_out, 'submissions': sub_rows}
 
 
-def build_photos_by_lot(records, photos_dir):
-    photos_by_lot = {}
-    seen_hashes_by_lot = defaultdict(set)
-    missing = []
-    attempted = failed = skipped_dupes = 0
-    for r in records:
-        k = lotkey(r['brand'], r['lot'])
-        for p in r['photos']:
-            fid = extract_drive_file_id(p['url'])
-            if not fid:
-                continue
-            raw_candidates = [f for f in os.listdir(photos_dir) if f.startswith(fid + '.')] if os.path.isdir(photos_dir) else []
-            if not raw_candidates:
-                missing.append(fid)
-                continue
-            raw_path = os.path.join(photos_dir, raw_candidates[0])
-            with open(raw_path, 'rb') as fh:
-                content_hash = hashlib.sha256(fh.read()).hexdigest()
-            if content_hash in seen_hashes_by_lot[k]:
-                skipped_dupes += 1
-                continue
-            seen_hashes_by_lot[k].add(content_hash)
-            out_jpg = os.path.join(photos_dir, f'{fid}.__out.jpg')
-            attempted += 1
-            try:
-                b64 = process_photo(raw_path, out_jpg)
-            except Exception as e:
-                failed += 1
-                print(f'WARN: photo {fid} failed to process: {e}', file=sys.stderr)
-                continue
-            finally:
-                if os.path.exists(out_jpg):
-                    os.remove(out_jpg)
-            photos_by_lot.setdefault(k, []).append({
-                'b64': b64, 'tester': r['name'], 'date': r['dt'].strftime('%Y-%m-%d'), 'kind': p['kind'],
-            })
-    if missing:
-        print(f'WARN: {len(missing)} photo(s) referenced in the sheet were not found in {photos_dir}: {missing}', file=sys.stderr)
-    if skipped_dupes:
-        print(f'INFO: skipped {skipped_dupes} duplicate photo upload(s) (identical content hash within the same lot)', file=sys.stderr)
-    if attempted > 0 and failed == attempted:
-        raise RuntimeError(
-            f'all {attempted} photo(s) on disk failed to process (0 succeeded) - '
-            'this looks like a missing/broken image tool, not per-photo corruption; '
-            'aborting rather than publishing a dashboard with zero photos'
-        )
-    return photos_by_lot
-
-
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         print(__doc__)
         sys.exit(1)
     xlsx_path, photos_dir, out_path = sys.argv[1:4]
+    hosted_dir = sys.argv[4] if len(sys.argv) == 5 else os.path.join(os.path.dirname(os.path.abspath(out_path)), HOSTED_PHOTO_SUBDIR)
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates', 'fts_template.html')
 
     header, rows = parse_xlsx_sheet(xlsx_path)
@@ -269,7 +226,7 @@ def main():
     print(f'parsed {len(records)} records')
 
     dashboard_data = build_dashboard_data(records)
-    photos_by_lot = build_photos_by_lot(records, photos_dir)
+    photos_by_lot = build_photos_by_lot(records, photos_dir, hosted_dir, lotkey)
     reconcile_photo_counts(dashboard_data, photos_by_lot, lotkey)
     print(f'lots: {len(dashboard_data["lots"])}  photos matched to {len(photos_by_lot)} lots')
 
