@@ -1027,6 +1027,8 @@ function setLightboxZoom(on){
   const bd = document.getElementById('lightboxBackdrop');
   bd.classList.toggle('zoomed', on);
   if (!on) bd.scrollTo(0, 0);
+  const hint = document.getElementById('lightboxHint');
+  if (hint.dataset.ready) hint.textContent = on ? 'Click the photo to zoom out' : 'Click the photo to zoom';
 }
 document.getElementById('lightboxImg').addEventListener('click', e => {
   const img = e.currentTarget;
@@ -1044,12 +1046,12 @@ function renderLightbox(){
   // Show the embedded thumbnail at once, then swap in the full-size file when it has loaded.
   img.classList.add('loading');
   img.src = `data:image/jpeg;base64,${p.thumb}`;
-  hint.textContent = 'Loading full-size photo…';
+  delete hint.dataset.ready; hint.textContent = 'Loading full-size photo…';
   document.getElementById('lightboxOpen').href = url;
   const full = new Image();
   full.onload = () => {
     if (token !== lightboxToken) return;
-    img.src = url; img.classList.remove('loading'); hint.textContent = 'Click the photo to zoom';
+    img.src = url; img.classList.remove('loading'); hint.dataset.ready = '1'; hint.textContent = 'Click the photo to zoom';
   };
   full.onerror = () => {
     if (token !== lightboxToken) return;
