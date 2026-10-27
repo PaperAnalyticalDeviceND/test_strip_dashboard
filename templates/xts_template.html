@@ -222,6 +222,14 @@
   .lightbox-backdrop.open{display:flex;}
   .lightbox-img{max-width:min(92vw,900px); max-height:74vh; object-fit:contain; border-radius:6px; box-shadow:0 10px 40px rgba(0,0,0,.5);}
   .lightbox-caption{color:#e8edee; font-size:13px; margin-top:14px; font-family:var(--font-mono);}
+  .lightbox-tools{color:#aab6af; font-size:12px; margin-top:6px; font-family:var(--font-mono); text-align:center;}
+  .lightbox-tools a{color:#cfe3da; margin-left:10px;}
+  .lightbox-img{cursor:zoom-in;}
+  .lightbox-img.loading{cursor:progress; opacity:.85;}
+  /* Zoomed: the photo shows at its real pixel size and the overlay scrolls to pan. Auto margins
+     centre it without clipping the left/top edge when it is larger than the window. */
+  .lightbox-backdrop.zoomed{overflow:auto; align-items:flex-start; justify-content:flex-start;}
+  .lightbox-img.zoomed{max-width:none; max-height:none; margin:56px auto 0; cursor:zoom-out; border-radius:0;}
   .lightbox-nav{position:fixed; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.1); border:none; color:#fff; width:44px; height:44px; border-radius:50%; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center;}
   .lightbox-nav:hover{background:rgba(255,255,255,.2);}
   .lightbox-prev{left:20px;} .lightbox-next{right:20px;}
@@ -422,11 +430,15 @@
   <button class="lightbox-nav lightbox-prev" id="lightboxPrevBtn" aria-label="Previous photo">‹</button>
   <img class="lightbox-img" id="lightboxImg" alt="">
   <div class="lightbox-caption" id="lightboxCaption"></div>
+  <div class="lightbox-tools"><span id="lightboxHint"></span> <a id="lightboxOpen" target="_blank" rel="noopener">Open full size &#8599;</a></div>
   <button class="lightbox-nav lightbox-next" id="lightboxNextBtn" aria-label="Next photo">›</button>
 </div>
 
 <script>
 const PHOTOS_BY_LOT = __PHOTOS_DATA__;
+// Each entry holds a small embedded thumbnail (.thumb) and the name of the full-size file (.h),
+// which is hosted next to this page and loaded only when a photo is opened.
+const PHOTO_BASE = '__PHOTO_BASE__';
 const DATA = __DASHBOARD_DATA__;
 document.getElementById("versionNote").textContent = "Dashboard v" + DATA.dashboard_version;
 
@@ -738,7 +750,7 @@ function lotCardHTML(l, sortMode){
   const lotPhotos = PHOTOS_BY_LOT[galleryKey] || [];
   const thumb = lotPhotos.length
     ? `<button class="lot-thumb" data-gallery-key="${keyAttr}" title="View all ${l.n_photos} photos">
-         <img src="data:image/jpeg;base64,${lotPhotos[0].b64}" alt="Package photo for ${esc(l.brand)} lot ${esc(l.lot)}">
+         <img src="data:image/jpeg;base64,${lotPhotos[0].thumb}" alt="Package photo for ${esc(l.brand)} lot ${esc(l.lot)}">
        </button>`
     : `<button class="lot-thumb placeholder" title="No product photos uploaded for this lot" disabled>
          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-5-5L5 19"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
@@ -958,7 +970,7 @@ function openGallery(key){
   currentGalleryKey = key;
   const thumbs = photos.map((p, i) => `
     <div class="gallery-thumb" data-index="${i}" tabindex="0">
-      <img src="data:image/jpeg;base64,${p.b64}" alt="Photo of ${l ? esc(l.brand) : ''} lot ${l ? esc(l.lot) : ''}, uploaded by ${esc(p.tester)}">
+      <img src="data:image/jpeg;base64,${p.thumb}" alt="Photo of ${l ? esc(l.brand) : ''} lot ${l ? esc(l.lot) : ''}, uploaded by ${esc(p.tester)}">
       <div class="cap">${esc(p.tester)} &middot; ${esc(p.date)}</div>
     </div>`).join('');
   document.getElementById('gallery').innerHTML = `
@@ -989,15 +1001,45 @@ function openLightbox(key, index){
   document.getElementById('lightboxBackdrop').classList.add('open');
   pushModal('lightbox');
 }
+let lightboxToken = 0;
+function setLightboxZoom(on){
+  document.getElementById('lightboxImg').classList.toggle('zoomed', on);
+  const bd = document.getElementById('lightboxBackdrop');
+  bd.classList.toggle('zoomed', on);
+  if (!on) bd.scrollTo(0, 0);
+}
+document.getElementById('lightboxImg').addEventListener('click', e => {
+  const img = e.currentTarget;
+  if (!img.classList.contains('loading')) setLightboxZoom(!img.classList.contains('zoomed'));
+});
 function renderLightbox(){
   const photos = PHOTOS_BY_LOT[currentGalleryKey] || [];
   const p = photos[currentLightboxIndex];
   if (!p) return;
-  document.getElementById('lightboxImg').src = `data:image/jpeg;base64,${p.b64}`;
+  const img = document.getElementById('lightboxImg');
+  const url = PHOTO_BASE + p.h;
+  const hint = document.getElementById('lightboxHint');
+  const token = ++lightboxToken;
+  setLightboxZoom(false);
+  // Show the embedded thumbnail at once, then swap in the full-size file when it has loaded.
+  img.classList.add('loading');
+  img.src = `data:image/jpeg;base64,${p.thumb}`;
+  hint.textContent = 'Loading full-size photo…';
+  document.getElementById('lightboxOpen').href = url;
+  const full = new Image();
+  full.onload = () => {
+    if (token !== lightboxToken) return;
+    img.src = url; img.classList.remove('loading'); hint.textContent = 'Click the photo to zoom';
+  };
+  full.onerror = () => {
+    if (token !== lightboxToken) return;
+    img.classList.remove('loading'); hint.textContent = 'Full-size photo unavailable; showing the preview';
+  };
+  full.src = url;
   document.getElementById('lightboxCaption').textContent = `${p.tester} · ${p.date}`;
   document.getElementById('lightboxCount').textContent = `${currentLightboxIndex+1} / ${photos.length}`;
 }
-function hideLightbox(){ document.getElementById('lightboxBackdrop').classList.remove('open'); }
+function hideLightbox(){ setLightboxZoom(false); document.getElementById('lightboxBackdrop').classList.remove('open'); }
 function lightboxPrev(){
   const photos = PHOTOS_BY_LOT[currentGalleryKey] || [];
   currentLightboxIndex = (currentLightboxIndex - 1 + photos.length) % photos.length;

@@ -22,6 +22,11 @@ on:
     - cron: '0 1 * * 6'   # Saturday 01:00 UTC = Friday 20:00 EST (winter)
     - cron: '0 0 * * 6'   # Saturday 00:00 UTC = Friday 20:00 EDT (summer)
   workflow_dispatch:       # manual "Run workflow" button, for testing
+    inputs:
+      dry_run:
+        description: 'Build only: do not publish; upload the built site as a downloadable artifact instead'
+        type: boolean
+        default: false
 
 concurrency:
   group: weekly-update
@@ -54,6 +59,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y imagemagick
 
+      - name: Fetch the published site (to reuse photos that are already hosted)
+        run: |
+          set -euo pipefail
+          # Default checkout is shallow / main-only; fetch gh-pages so photos published by
+          # earlier runs can be reused. Each photo is processed once and then left in place.
+          git fetch --depth=1 origin gh-pages:gh-pages
+          git worktree add /tmp/gh-pages-worktree gh-pages
+          mkdir -p _build/photos
+          if [ -d /tmp/gh-pages-worktree/photos ]; then cp -R /tmp/gh-pages-worktree/photos/. _build/photos/; fi
+          echo "already-hosted photos: $(find _build/photos -name '*.jpg' 2>/dev/null | wc -l)"
+
       - name: Write service-account JSON from secret
         run: |
           mkdir -p .secrets
@@ -70,12 +86,13 @@ jobs:
             --photo-column 51 \
             --out-xlsx responses_fts.xlsx \
             --out-photos-dir photos_fts \
+            --skip-hosted-dir _build/photos/v1 \
             --sa-json .secrets/gdrive_sa.json
 
       - name: Build FTS dashboard
         run: |
           mkdir -p _build
-          python3 build_fts.py responses_fts.xlsx photos_fts _build/fts.html
+          python3 build_fts.py responses_fts.xlsx photos_fts _build/fts.html _build/photos/v1
 
       - name: Fetch XTS response sheet + photos from Google Drive
         run: |
@@ -85,11 +102,12 @@ jobs:
             --photo-column 71 \
             --out-xlsx responses_xts.xlsx \
             --out-photos-dir photos_xts \
+            --skip-hosted-dir _build/photos/v1 \
             --sa-json .secrets/gdrive_sa.json
 
       - name: Build XTS dashboard
         run: |
-          python3 build_xts.py responses_xts.xlsx photos_xts _build/xts.html
+          python3 build_xts.py responses_xts.xlsx photos_xts _build/xts.html _build/photos/v1
 
       - name: Fetch lot-intake response sheet from Google Drive
         run: |
@@ -119,22 +137,33 @@ jobs:
         if: always()
         run: rm -f .secrets/gdrive_sa.json
 
+      - name: Upload the built site for review (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-site
+          path: _build
+          retention-days: 3
+
       - name: Publish built dashboards to gh-pages
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          # Default checkout is shallow / main-only — fetch gh-pages first so
-          # the worktree add below has a ref to point at.
-          git fetch --depth=1 origin gh-pages:gh-pages
-          git worktree add /tmp/gh-pages-worktree gh-pages
+          # The gh-pages worktree was set up earlier, before the build.
           cp _build/*.html /tmp/gh-pages-worktree/
+          # Hosted photos: add only the new ones. Files already published are identical,
+          # so git sees no change for them.
+          mkdir -p /tmp/gh-pages-worktree/photos
+          cp -R _build/photos/. /tmp/gh-pages-worktree/photos/
           cd /tmp/gh-pages-worktree
           git add fts.html || true
           git add xts.html || true
           git add progress.html || true
           git add index.html || true
           git add methodology.html || true
+          git add photos || true
           if git diff --cached --quiet; then
             echo "no changes to publish"
           else
