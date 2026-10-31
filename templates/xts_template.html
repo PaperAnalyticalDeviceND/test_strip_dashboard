@@ -188,6 +188,8 @@
   .drawer-close{ background:var(--surface-2); border:1px solid var(--border); border-radius:8px; width:30px; height:30px; cursor:pointer; color:var(--ink-2); font-size:16px; line-height:1; }
   .drawer-close:hover{color:var(--ink);}
   .drawer-summary{font-size:13.5px; color:var(--ink-2); line-height:1.5; margin:0 0 18px; padding:10px 14px; background:var(--surface-2); border-radius:8px;}
+  .drawer-summary p{margin:0 0 7px;} .drawer-summary p:last-child{margin-bottom:0;}
+  .drawer-summary .sum-flag{color:var(--crit); background:var(--crit-tint); border-radius:6px; padding:6px 9px;}
   .drawer-metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:20px;}
   .drawer-metrics .stat{padding:12px 12px;}
   .drawer-metrics .value{font-size:18px;}
@@ -540,24 +542,23 @@ function lotFitForUseScore(l, eligible, commonality){
 }
 function lotFitForUseSentence(l){
   const score = lotFitForUseScore(l);
-  if (!score) return '';
+  if (!score) return `Not enough testing yet to compare this lot with others (needs ${HIGH_VOLUME_THRESHOLD}+ strips).`;
   const {compositePct, clarityPct, resistPct} = score;
   const weakClarity = clarityPct !== null && clarityPct <= 0.3;
   const weakResist = resistPct !== null && resistPct <= 0.3;
   const strongClarity = clarityPct !== null && clarityPct >= 0.7;
   const strongResist = resistPct !== null && resistPct >= 0.7;
-
   if (compositePct >= 0.7) {
-    if (strongClarity && strongResist) return 'Compared to other well-tested lots, this lot performs better than most, both in how cleanly it reads positive for xylazine and in resisting common interferents.';
-    if (strongClarity) return 'Compared to other well-tested lots, this lot performs better than most in how cleanly it reads positive for xylazine.';
-    return 'Compared to other well-tested lots, this lot performs better than most in resisting common interferents.';
+    if (strongClarity && strongResist) return '<strong>Better than most</strong> well-tested lots, both in how cleanly it reads positive for xylazine and in resisting common interferents.';
+    if (strongClarity) return '<strong>Better than most</strong> well-tested lots in how cleanly it reads positive for xylazine.';
+    return '<strong>Better than most</strong> well-tested lots in resisting common interferents.';
   }
   if (compositePct <= 0.3) {
-    if (weakClarity && weakResist) return 'Compared to other well-tested lots, this lot has more weaknesses than most, both in faint/ambiguous positive reads and in resisting common interferents.';
-    if (weakClarity) return 'Compared to other well-tested lots, this lot has more weaknesses than most: its positive reads tend to be faint rather than clean.';
-    return 'Compared to other well-tested lots, this lot has more weaknesses than most in resisting common interferents.';
+    if (weakClarity && weakResist) return '<strong>Worse than average</strong> among well-tested lots, both in faint or ambiguous positive reads and in resisting common interferents.';
+    if (weakClarity) return '<strong>Worse than average</strong> among well-tested lots: its positive reads tend to be faint rather than clean.';
+    return '<strong>Worse than average</strong> among well-tested lots in resisting common interferents.';
   }
-  return '';
+  return '<strong>About average</strong> among well-tested lots.';
 }
 // All free-text fields below (brand, lot, tester, notes, ...) come straight from an
 // externally-submitted Google Form. Never interpolate them into innerHTML without
@@ -845,57 +846,101 @@ function latestExpDate(l){
   const d = parseDateMDY(l.expirations[l.expirations.length - 1]);
   return isNaN(d) ? null : d;
 }
-function expirationClause(l){
-  if (!l.expirations || !l.expirations.length) return '';
-  const latestStr = l.expirations[l.expirations.length - 1];
+/* ---------- lot summary (drawer) ----------
+   Fixed structure agreed with Marya (2026-10-31): (1) how the lot compares with other
+   well-tested lots; (2) detection of the target, with the test concentration/matrix and any
+   faint test lines; (3) interferents, leading with those that act below 2 mg/mL, again with
+   faint test lines; (4) expiration. Good true-negative results are never mentioned (nearly
+   every strip is perfect); a false positive in plain water is a serious flaw and is called out.
+   Returns HTML: every data-derived string is escaped, and the only markup is built here. */
+const FAINT_NOTE_RE = /faint|feint|weak line/i;
+const faintWord = (n = 1) => incWord(n === 1 ? 'faint test line' : 'faint test lines');
+const plural = (n, one, many) => n === 1 ? one : (many || one + 's');
+function joinList(items){
+  if (items.length <= 1) return items.join('');
+  return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+// Tester notes that report a faint test line, split by what they are about. A note is counted
+// under interferents when it names one of this target's interferent substances (or says
+// "interfer…"); every other faint-line note is counted under detection of the target.
+function faintNoteCounts(l){
+  const needles = SUBSTANCES.map(s => s.label.toLowerCase().slice(0, 5));
+  let detect = 0, interf = 0;
+  submissions.forEach(s => {
+    if (s.brand !== l.brand || s.lot !== l.lot || !s.notes || !FAINT_NOTE_RE.test(s.notes)) return;
+    const t = s.notes.toLowerCase();
+    if (t.includes('interfer') || needles.some(n => t.includes(n))) interf++; else detect++;
+  });
+  return {detect, interf};
+}
+function faintNoteClause(n){
+  return n ? ` Testers' notes report a ${faintWord(1)} in ${n} ${plural(n, 'submission')}.` : '';
+}
+// Notable notes other than faint-line reports (those are counted above, not quoted).
+function otherNotableNotes(l){
+  return notableNotesForLot(l).filter(t => !FAINT_NOTE_RE.test(t));
+}
+function interferenceSentence(l, faintNotes){
+  const total = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
+  if (!total) return 'Interferents: not tested yet.' + faintNoteClause(faintNotes);
+  const hits = l.interferents;
+  if (!hits.length) return `No interferent caused a false positive across ${total} replicates.` + faintNoteClause(faintNotes);
+  const low = hits.filter(i => i.min_mg_ml < 2), high = hits.filter(i => i.min_mg_ml >= 2);
+  let s;
+  if (low.length) {
+    const byMg = {};
+    low.forEach(i => (byMg[i.min_mg_ml] = byMg[i.min_mg_ml] || []).push(esc(i.label)));
+    const parts = Object.keys(byMg).map(Number).sort((a,b)=>a-b).map(mg => `${joinList(byMg[mg])} (at ${mg} mg/mL)`);
+    s = `Below 2 mg/mL, false positives came from ${joinList(parts)}.`;
+    if (high.length) s += ` ${high.length <= 4 ? joinList(high.map(i => esc(i.label))) : high.length + ' more substances'} caused false positives only at 2 mg/mL.`;
+  } else {
+    s = `No interferent caused a false positive below 2 mg/mL; ${high.length <= 4 ? joinList(high.map(i => esc(i.label))) : high.length + ' substances'} did at 2 mg/mL.`;
+  }
+  const faintSubs = hits.filter(i => i.faint_hits > 0);
+  if (faintSubs.length) s += ` For ${faintSubs.length === hits.length ? 'all of these' : joinList(faintSubs.map(i => esc(i.label)))}, some reads were only a ${faintWord(1)}.`;
+  return s + faintNoteClause(faintNotes);
+}
+function expirationSentence(l){
+  if (!l.expirations || !l.expirations.length) return 'No expiration date has been recorded for this lot.';
+  const latestStr = esc(l.expirations[l.expirations.length - 1]);
   const d = latestExpDate(l);
-  if (d === null || d >= new Date()) return '';
-  return ` This lot's recorded expiration (${latestStr}) has passed, so it's probably no longer available for purchase.`;
+  const differs = l.expirations.length > 1 ? ` (testers recorded ${l.expirations.length} different dates: ${l.expirations.map(esc).join(', ')}; the latest is used)` : '';
+  if (d === null) return `Recorded expiration: ${latestStr}${differs}.`;
+  if (d >= new Date()) return `Expires ${latestStr}${differs}.`;
+  return `Expired ${latestStr}${differs}, so it's probably no longer available for purchase.`;
 }
 function lotSummary(l){
-  // Detection is summarized across all three concentration/water tests, in
-  // three parts: detected (no test line), inconclusive (faint line, 1-3) and
-  // missed (clear line, 4+). The per-condition split is in the stat panel
-  // right below the summary.
-  const keys = ['2500_di', '2500_tap', '1000_di'];
-  const clear = keys.reduce((a, k) => a + (l[`tp_${k}_clear`] || 0), 0);
-  const faint = keys.reduce((a, k) => a + (l[`tp_${k}_faint`] || 0), 0);
-  const miss  = keys.reduce((a, k) => a + (l[`tp_${k}_miss`] || 0), 0);
-  const tpRun = clear + faint + miss;
-  const tnClean = l.tn_run ? (l.tn_run - l.tn_pos) === l.tn_run : true;
-  const allPerfect = tpRun > 0 && faint === 0 && miss === 0 && tnClean;
-
-  let sentence;
-  if (allPerfect) {
-    sentence = 'This lot performed perfectly across all xylazine detection and true-negative tests, with no faint lines.';
-  } else if (tpRun === 0) {
-    sentence = 'No test results recorded yet for this lot.';
-  } else {
-    sentence = `Of ${tpRun} detection tests: ${clear} clearly detected, ${faint} inconclusive (faint line), ${miss} missed.`;
-    if (l.tn_run) sentence += ` In plain water it read correctly ${fmtRatioPhrase(l.tn_run - l.tn_pos, l.tn_run)}.`;
-  }
-  const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
-  const fitSentence = lotFitForUseSentence(l);
-  if (fitSentence) sentence = fitSentence + ' ' + sentence;
-  // Keep the computed part short so the expiration warning and tester notes that
-  // follow it stay prominent. The interferent list is already shown in full
-  // right below the summary, so name at most two here and defer to it if the
-  // sentence is still long.
-  if (l.interferents.length) {
-    const n = l.interferents.length, labels = l.interferents.map(i=>i.label);
-    const named = labels.length <= 2 ? labels.join(' and ') : labels.slice(0, 2).join(', ') + ` and ${n - 2} more`;
-    let flagged = ` Flagged by ${n} interferent${n>1?'s':''}: ${named}.`;
-    if ((sentence + flagged).trim().split(/\s+/).length > 45) flagged = ` Flagged by ${n} interferent${n>1?'s':''} (listed below).`;
-    sentence += flagged;
-  } else if (totalInterferenceRuns) {
-    sentence += ` No interferents detected across ${totalInterferenceRuns} replicates.`;
-  }
-  sentence += expirationClause(l);
-  const notableNotes = notableNotesForLot(l);
-  if (notableNotes.length) {
-    sentence += ` Testers comment that ${notableNotes.map(esc).join(' Also: ')}`;
-  }
-  return sentence;
+  const faintNotes = faintNoteCounts(l);
+  const paras = [];
+  paras.push(`<p>${lotFitForUseSentence(l)}</p>`);
+  const flaw = waterFalsePositiveSentence(l);
+  if (flaw) paras.push(`<p class="sum-flag">${flaw}</p>`);
+  paras.push(`<p>${detectionSentence(l, faintNotes.detect)}</p>`);
+  paras.push(`<p>${interferenceSentence(l, faintNotes.interf)}</p>`);
+  const other = otherNotableNotes(l);
+  // Long notes are cut short here; the full text is in the submission log.
+  const clip = t => { t = t.replace(/\s+/g, ' ').trim(); return t.length > 220 ? t.slice(0, 220).trim() + '…' : t; };
+  if (other.length) paras.push(`<p>Testers comment that ${other.map(t => esc(clip(t))).join(' Also: ')}</p>`);
+  paras.push(`<p>${expirationSentence(l)}</p>`);
+  return paras.join('');
+}
+function waterFalsePositiveSentence(l){
+  if (!l.tn_pos) return '';
+  return `<strong>Serious flaw:</strong> blank strips in plain water read positive (a false positive) in ${l.tn_pos} of ${l.tn_run} ${plural(l.tn_run, 'test')}.`;
+}
+function detectionSentence(l, faintNotes){
+  const conds = [['2500_di', '2500 ng/mL in DI water'], ['2500_tap', '2500 ng/mL in hard tap water'], ['1000_di', '1000 ng/mL in DI water']];
+  const parts = [];
+  conds.forEach(([k, label]) => {
+    const clear = l[`tp_${k}_clear`] || 0, faint = l[`tp_${k}_faint`] || 0, miss = l[`tp_${k}_miss`] || 0, run = clear + faint + miss;
+    if (!run) return;
+    let p = `${label}, ${clear} of ${run} clearly detected`;
+    if (faint) p += `, ${faint} ${faintWord(faint)}`;
+    if (miss) p += `, ${miss} missed`;
+    parts.push(p);
+  });
+  if (!parts.length) return 'No xylazine detection tests recorded yet.' + faintNoteClause(faintNotes);
+  return `Xylazine detection: ${parts.join('; ')}.` + faintNoteClause(faintNotes);
 }
 function openDrawer(key){
   const l = lots.find(x => (x.brand+'||'+x.lot) === key);
@@ -932,7 +977,7 @@ function openDrawer(key){
       </div>
       <button class="drawer-close" id="drawerCloseBtn" aria-label="Close">✕</button>
     </div>
-    <p class="drawer-summary">${lotSummary(l).replace(/inconclusive/g, m => incWord(m))}</p>
+    <div class="drawer-summary">${lotSummary(l)}</div>
     <div class="tri-legend" style="margin-bottom:10px;"><span><i class="seg-clear"></i>Detected</span><span><i class="seg-inc"></i>${incWord('Inconclusive')} (faint line)</span><span><i class="seg-miss"></i>Missed</span></div>
     <div class="drawer-metrics">
       <div class="stat"><div class="label">2500 DI</div><div class="value">${triFromLot(l,'2500_di').run ? fmtPct(triFromLot(l,'2500_di').pClear) : '&mdash;'}</div>${triBar(triFromLot(l,'2500_di'))}<div class="foot">${triText(triFromLot(l,'2500_di'))}</div></div>

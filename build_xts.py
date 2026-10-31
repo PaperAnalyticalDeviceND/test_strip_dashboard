@@ -130,7 +130,7 @@ def build_dashboard_data(records):
         'tp': {'2500_di': [0, 0, 0], '2500_tap': [0, 0, 0], '1000_di': [0, 0, 0]},
         'tn_run': 0, 'tn_pos': 0,
         'sub_stats': defaultdict(lambda: {
-            'run': 0, 'hits': 0, 'min_mg': None, 'min_intensity': None,
+            'run': 0, 'hits': 0, 'faint_hits': 0, 'min_mg': None, 'min_intensity': None,
             'by_level': {'HI': {'run': 0, 'hits': 0}, 'MED': {'run': 0, 'hits': 0}, 'LO': {'run': 0, 'hits': 0}},
         }),
     })
@@ -174,6 +174,9 @@ def build_dashboard_data(records):
                     mg = LEVEL_MG[level]
                     if st['min_mg'] is None or mg < st['min_mg']:
                         st['min_mg'] = mg
+                    # a hit read from a 1-3 intensity (not a flat Positive / intensity 0) is a faint test line
+                    if res['kind'] == 'intensity' and res['min_intensity'] >= 1:
+                        st['faint_hits'] += 1
                     if res['min_intensity'] is not None and (st['min_intensity'] is None or res['min_intensity'] < st['min_intensity']):
                         st['min_intensity'] = res['min_intensity']
                     row_flags.append(f"{sub}@{mg}")
@@ -197,11 +200,11 @@ def build_dashboard_data(records):
         interferents = []
         for sub, st in L['sub_stats'].items():
             if st['hits'] > 0:
-                interferents.append({'substance': sub, 'label': SUB_LABEL[sub], 'min_mg_ml': st['min_mg'], 'min_intensity': st['min_intensity'], 'hits': st['hits'], 'run': st['run']})
+                interferents.append({'substance': sub, 'label': SUB_LABEL[sub], 'min_mg_ml': st['min_mg'], 'min_intensity': st['min_intensity'], 'hits': st['hits'], 'faint_hits': st['faint_hits'], 'run': st['run']})
         interferents.sort(key=lambda x: x['min_mg_ml'])
         matrix = {
             sub: {
-                'run': L['sub_stats'][sub]['run'], 'hits': L['sub_stats'][sub]['hits'],
+                'run': L['sub_stats'][sub]['run'], 'hits': L['sub_stats'][sub]['hits'], 'faint_hits': L['sub_stats'][sub]['faint_hits'],
                 'min_mg': L['sub_stats'][sub]['min_mg'], 'min_intensity': L['sub_stats'][sub]['min_intensity'],
                 'by_level': L['sub_stats'][sub]['by_level'],
             }
