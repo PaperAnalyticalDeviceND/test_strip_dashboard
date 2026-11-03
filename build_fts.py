@@ -27,7 +27,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
-    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id,
+    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id, split_claude_notes,
     build_photos_by_lot, inject_into_template,
     reconcile_photo_counts, DASHBOARD_VERSION, HOSTED_PHOTO_SUBDIR,
 )
@@ -147,6 +147,7 @@ def build_dashboard_data(records):
                     row_interferents.append(f"{sub}@{mg}")
 
         post_exp = bool(r['expiration_dt'] and r['dt'].date() > r['expiration_dt'].date())
+        claude_notes, plain_notes = split_claude_notes(r['notes'], r['other_notes'])
         sub_rows.append({
             'id': idx, 'timestamp': r['dt'].strftime('%-m/%-d/%Y %H:%M:%S'), 'ts_sort': r['dt'].isoformat(),
             'tester': r['name'], 'affiliation': r['affiliation'],
@@ -159,6 +160,7 @@ def build_dashboard_data(records):
             'interferents_flagged': row_interferents,
             'n_photos': len(r['photos']), 'first_photo': r['photos'][0]['url'] if r['photos'] else None,
             'notes': (r['notes'] or r['other_notes'] or '').strip(),
+            'claude_notes': claude_notes, 'plain_notes': plain_notes[0] if plain_notes else '',
             'source': r['source'], 'packaging_issues': r['packaging_issues'],
         })
 

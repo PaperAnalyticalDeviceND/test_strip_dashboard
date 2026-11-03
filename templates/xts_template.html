@@ -827,8 +827,8 @@ function noteIsNotable(text){
 }
 function notableNotesForLot(l){
   const notes = submissions
-    .filter(s => s.brand === l.brand && s.lot === l.lot && s.notes && noteIsNotable(s.notes))
-    .map(s => s.notes.trim());
+    .filter(s => s.brand === l.brand && s.lot === l.lot && s.plain_notes && noteIsNotable(s.plain_notes))
+    .map(s => s.plain_notes.trim());
   return [...new Set(notes)];
 }
 // M/D/YYYY (as formatted by build_xts.py) -> Date, or an Invalid Date if
@@ -867,8 +867,8 @@ function faintNoteCounts(l){
   const needles = SUBSTANCES.map(s => s.label.toLowerCase().slice(0, 5));
   let detect = 0, interf = 0;
   submissions.forEach(s => {
-    if (s.brand !== l.brand || s.lot !== l.lot || !s.notes || !FAINT_NOTE_RE.test(s.notes)) return;
-    const t = s.notes.toLowerCase();
+    if (s.brand !== l.brand || s.lot !== l.lot || !s.plain_notes || !FAINT_NOTE_RE.test(s.plain_notes)) return;
+    const t = s.plain_notes.toLowerCase();
     if (t.includes('interfer') || needles.some(n => t.includes(n))) interf++; else detect++;
   });
   return {detect, interf};
@@ -915,7 +915,11 @@ function lotSummary(l){
   paras.push(`<p>${lotFitForUseSentence(l)}</p>`);
   const flaw = waterFalsePositiveSentence(l);
   if (flaw) paras.push(`<p class="sum-flag">${flaw}</p>`);
-  paras.push(`<p>${detectionSentence(l, faintNotes.detect)}</p>`);
+  const fromTesters = claudeNotesForLot(l);
+  const detection = detectionSentence(l, faintNotes.detect, fromTesters.length > 0);
+  if (detection) paras.push(`<p>${detection}</p>`);
+  // Sentences testers wrote for the summary itself (addressed to "Claude" in the notes field) are shown as written.
+  if (fromTesters.length) paras.push(`<p>${fromTesters.map(esc).join(' ')}</p>`);
   paras.push(`<p>${interferenceSentence(l, faintNotes.interf)}</p>`);
   const other = otherNotableNotes(l);
   // Long notes are cut short here; the full text is in the submission log.
@@ -924,11 +928,20 @@ function lotSummary(l){
   paras.push(`<p>${expirationSentence(l)}</p>`);
   return paras.join('');
 }
+// Summary sentences testers addressed to "Claude" (split out in the build), de-duplicated across a lot's submissions.
+function claudeNotesForLot(l){
+  const out = [];
+  submissions.forEach(s => {
+    if (s.brand !== l.brand || s.lot !== l.lot) return;
+    (s.claude_notes || []).forEach(t => { if (!out.includes(t)) out.push(t); });
+  });
+  return out;
+}
 function waterFalsePositiveSentence(l){
   if (!l.tn_pos) return '';
   return `<strong>Serious flaw:</strong> blank strips in plain water read positive (a false positive) in ${l.tn_pos} of ${l.tn_run} ${plural(l.tn_run, 'test')}.`;
 }
-function detectionSentence(l, faintNotes){
+function detectionSentence(l, faintNotes, hasTesterSummary){
   const conds = [['2500_di', '2500 ng/mL in DI water'], ['2500_tap', '2500 ng/mL in hard tap water'], ['1000_di', '1000 ng/mL in DI water']];
   const parts = [];
   conds.forEach(([k, label]) => {
@@ -939,7 +952,7 @@ function detectionSentence(l, faintNotes){
     if (miss) p += `, ${miss} missed`;
     parts.push(p);
   });
-  if (!parts.length) return 'No xylazine detection tests recorded yet.' + faintNoteClause(faintNotes);
+  if (!parts.length) return hasTesterSummary ? '' : 'No xylazine detection tests recorded yet.' + faintNoteClause(faintNotes);
   return `Xylazine detection: ${parts.join('; ')}.` + faintNoteClause(faintNotes);
 }
 function openDrawer(key){

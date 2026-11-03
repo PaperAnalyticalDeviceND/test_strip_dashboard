@@ -156,6 +156,41 @@ def sanitize_text(s, max_len=800):
     return s
 
 
+_CLAUDE_RE = re.compile(r'\bclaude\b', re.I)
+_CLAUDE_ASIDE_RE = re.compile(r'\s*\(\s*I (?:attached|uploaded|added)\b[^)]*\)', re.I)
+
+
+def split_claude_notes(*fields):
+    """Testers can address a sentence to the assistant that maintains the
+    dashboard ("Claude, note this in the summary: ...") in any free-text
+    notes field. Returns (claude_notes, plain_notes): claude_notes is a list
+    of the sentences meant for the lot summary, with the "Claude, ...:"
+    address and any "(I attached the photo)" aside removed; plain_notes is
+    the remaining ordinary note text, so the same words are not also counted
+    as a routine tester comment."""
+    claude, plain = [], []
+    for f in fields:
+        text = (f or '').strip()
+        m = _CLAUDE_RE.search(text)
+        if not m:
+            if text:
+                plain.append(text)
+            continue
+        before, after = text[:m.start()].strip(), text[m.end():]
+        colon = after.find(':')
+        period = re.search(r'[.!?]', after)
+        if colon != -1 and colon < 80 and (not period or colon < period.start()):
+            after = after[colon + 1:]
+        else:
+            after = re.sub(r'^[\s,;:-]+', '', after)
+        after = _CLAUDE_ASIDE_RE.sub('', after).strip()
+        if before:
+            plain.append(before)
+        if after:
+            claude.append(sanitize_text(re.sub(r'\s+', ' ', after)))
+    return claude, plain
+
+
 # ---------------------------------------------------------------------------
 # Photo processing — macOS `sips` locally, ImageMagick/Pillow elsewhere (e.g.
 # a Linux cloud sandbox where `sips` doesn't exist)
