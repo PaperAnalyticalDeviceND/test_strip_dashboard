@@ -1,15 +1,14 @@
 # robots.txt for padproject.info -- opt out of AI training and AI data collection.
 #
-# Crawlers only read /robots.txt at the HOST ROOT (https://padproject.info/robots.txt),
-# so this file must be copied to the root of the padproject.info site repo
-# (PaperAnalyticalDeviceND/padproject.info, gh-pages). A copy served from
-# /test_strip_dashboard/ is ignored. It is deliberately NOT published by this
-# repo's weekly-update workflow. See the Data Use & Protection Statement
-# (data-use.html) for the terms this file signals.
+# Crawlers only read /robots.txt at the host root (https://padproject.info/robots.txt).
+# The root site is built from the main branch of PaperAnalyticalDeviceND.github.io and
+# published to gh-pages (which is overwritten on every publish), so this file belongs
+# in main and in build.py's STATIC_FILES list. A copy served from /test_strip_dashboard/
+# is ignored by crawlers, so this repo's workflow does not publish it.
 #
 # Ordinary search engines (Googlebot, Bingbot, etc.) are not listed and stay allowed.
-# robots.txt is a request, not an enforcement mechanism: compliant crawlers honor it,
-# others do not.
+# robots.txt is a request, not enforcement: compliant crawlers honor it, others do not.
+# Terms: https://padproject.info/test_strip_dashboard/data-use.html
 
 # --- OpenAI
 User-agent: GPTBot
