@@ -5,7 +5,8 @@ deep-dive page) from already-built FTS/XTS/progress dashboards.
 Usage:
     python3 build_hub.py <fts.html> <xts.html> <progress.html> \\
         <hub_template.html> <hub_output.html> \\
-        <methodology_template.html> <methodology_output.html>
+        <methodology_template.html> <methodology_output.html> \\
+        [<data_use_template.html> <data_use_output.html>]
 
 Reads each dashboard's embedded `const DATA = {...}` blob (the same JSON
 build_fts.py/build_xts.py/build_progress.py inject into their own
@@ -75,11 +76,12 @@ def _faint_photo():
 
 
 def main():
-    if len(sys.argv) != 8:
+    if len(sys.argv) not in (8, 10):
         print(__doc__)
         sys.exit(1)
     (fts_path, xts_path, progress_path, template_path, out_path,
      methodology_template_path, methodology_out_path) = sys.argv[1:8]
+    data_use_template_path, data_use_out_path = sys.argv[8:10] if len(sys.argv) == 10 else (None, None)
 
     fts_data = extract_dashboard_data(fts_path)
     xts_data = extract_dashboard_data(xts_path)
@@ -147,6 +149,16 @@ def main():
     with open(methodology_out_path, 'w', encoding='utf-8') as f:
         f.write(methodology_html)
     print(f'wrote {methodology_out_path} ({len(methodology_html)} bytes)')
+
+    # Static data use & protection statement (linked from every page's footer).
+    if data_use_template_path:
+        data_use_html = open(data_use_template_path, encoding='utf-8').read()
+        if '__HUB_VERSION_NOTE__' not in data_use_html:
+            raise RuntimeError(f'{data_use_template_path} is missing placeholder __HUB_VERSION_NOTE__')
+        data_use_html = data_use_html.replace('__HUB_VERSION_NOTE__', version_note)
+        with open(data_use_out_path, 'w', encoding='utf-8') as f:
+            f.write(data_use_html)
+        print(f'wrote {data_use_out_path} ({len(data_use_html)} bytes)')
 
 
 if __name__ == '__main__':
