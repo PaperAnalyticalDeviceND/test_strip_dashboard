@@ -1,6 +1,6 @@
-# Data Use & Protection Statement (DRAFT for editing)
+# Data Use & Protection Statement (approved text; the page template is the source of truth)
 
-Modeled on the UNC Opioid Data Lab statement. Items in [square brackets] are decisions or facts to confirm.
+Modeled on the UNC Opioid Data Lab statement. Decisions made 2026-11-03: soften the legal claim to a copyright line; keep tester names published and say so; include the no-advertising clause. The live wording is in templates/data_use_template.html.
 
 ---
 
