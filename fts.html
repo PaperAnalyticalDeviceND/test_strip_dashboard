@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noai, noimageai">
 <title>FTS Lot Characteristics — Lieberman Lab</title>
 <style>
   :root{
@@ -438,6 +439,8 @@
     .masthead{flex-direction:column; align-items:flex-start;}
     .masthead-right{text-align:left;}
   }
+  .datause-btn{display:inline-block;margin-top:10px;padding:4px 12px;border:1px solid var(--border);border-radius:999px;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-2);text-decoration:none;}
+  .datause-btn:hover{color:var(--accent);border-color:var(--accent);}
 </style>
 <script data-goatcounter="https://liebermandashboards.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -508,6 +511,7 @@
   <footer>
     <strong>Method.</strong> All figures on this page are based on reports to the password-protected lot checking data collector form. If your lab wants to participate, contact <a href="mailto:mlieberm@nd.edu">Prof.&nbsp;Lieberman</a>. A lot is identified by Brand&nbsp;+&nbsp;Lot&nbsp;number; expiration dates are recorded but not used for matching, since testers occasionally mistype them. &ldquo;Fentanyl detection rate&rdquo; pools every individual strip run at 200&nbsp;ng/mL across all submissions for that lot; &ldquo;true negative&rdquo; pools every strip run in plain water. Interferents are flagged when any replicate at any tested concentration (2.0, 0.7, or 0.2&nbsp;mg/mL) read positive. Some recently-logged lots show &ldquo;&mdash;&rdquo; because no replicates have been run yet. Thumbnails and gallery photos use each submission's product/packaging upload (column M) and strip-photo upload (column AZ), merged into one gallery per lot; a hash of each photo's contents is used to skip duplicate uploads of the same image. This is a static prototype, so photos are a fixed snapshot and refresh is manual for now. Chemical structure thumbnails on the interference matrix page are skeletal formulas from Wikimedia Commons (public domain; click a structure to open its source Wikipedia article).
     <br><span id="versionNote"></span>
+    <br><a class="datause-btn" href="data-use.html">Data use &amp; protection</a>
   </footer>
 </div>
 
