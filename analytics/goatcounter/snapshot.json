@@ -1,51 +1,51 @@
 {
-  "pulled_at": "2026-10-31T01:36:11Z",
+  "pulled_at": "2026-11-07T01:35:54Z",
   "period_start": "2026-08-01T00:00:00Z",
-  "period_end": "2026-10-31T01:36:06Z",
-  "total_pageviews": 434,
-  "total_events": 79,
+  "period_end": "2026-11-07T01:35:48Z",
+  "total_pageviews": 539,
+  "total_events": 93,
   "pages": [
     {
       "path": "/test_strip_dashboard",
       "title": "Lieberman Lab \u2014 Test Strip Lot Checking Program",
       "is_event": false,
-      "count": 168
+      "count": 193
     },
     {
       "path": "/test_strip_dashboard/fts.html",
       "title": "FTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 110
+      "count": 152
     },
     {
       "path": "/test_strip_dashboard/xts.html",
       "title": "XTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 71
+      "count": 94
     },
     {
       "path": "fts-view-matrix",
       "title": "FTS view: matrix",
       "is_event": true,
-      "count": 30
-    },
-    {
-      "path": "xts-view-matrix",
-      "title": "XTS view: matrix",
-      "is_event": true,
-      "count": 14
+      "count": 36
     },
     {
       "path": "fts-view-log",
       "title": "FTS view: log",
       "is_event": true,
-      "count": 12
+      "count": 17
+    },
+    {
+      "path": "xts-view-matrix",
+      "title": "XTS view: matrix",
+      "is_event": true,
+      "count": 15
     },
     {
       "path": "fts-view-lots",
       "title": "FTS view: lots",
       "is_event": true,
-      "count": 9
+      "count": 11
     },
     {
       "path": "xts-view-lots",
@@ -54,16 +54,16 @@
       "count": 8
     },
     {
+      "path": "/test_strip_dashboard/methodology.html",
+      "title": "Methodology & Limitations \u2014 Lieberman Lab Test Strip Lot Checking",
+      "is_event": false,
+      "count": 6
+    },
+    {
       "path": "xts-view-log",
       "title": "XTS view: log",
       "is_event": true,
       "count": 6
-    },
-    {
-      "path": "/test_strip_dashboard/methodology.html",
-      "title": "Methodology & Limitations \u2014 Lieberman Lab Test Strip Lot Checking",
-      "is_event": false,
-      "count": 5
     },
     {
       "path": "/test_strip_dashboard/xts.html?nc=live1",
