@@ -8,9 +8,11 @@
   "not_included": "Limit-of-detection curves (Figures 2 and 3), tap water and temperature results, and the dex:levo mixture grid values beyond the per-lot class below are plotted but not tabulated in the article; the supplementary information (SI Tables S2 and 4) was not part of this file.",
   "caveats": [
    "Methods text lists WiseBatch lot 'MTM24100902'; Table 1, Table 2 and the figures all say MTM24120002. MTM24120002 is used here.",
-   "Detomidine caused false positives on all seven lots at 2 mg/mL; for BTNX lots DOAB24080502, DOAB24100900 and DOAB24100902 all strips were still positive at 0.07 mg/mL and interference ceased at 0.02 mg/mL (SI Table S2). The authors call this cross-reactivity 'a feature, not a bug'.",
+   "Detomidine (a different molecule from medetomidine) read positive on all seven lots at 2 mg/mL, and on the three BTNX lots tested (DOAB24080502, DOAB24100900, DOAB24100902) all strips were still positive at 0.07 mg/mL, with interference ceasing at 0.02 mg/mL (SI Table S2). The authors suggest this cross-reactivity 'may be a feature, not a bug'. It is an observed result, not a design property, and is treated here as an ordinary interferent.",
    "Levamisole gave faint test lines (Neg-2 to Neg-4) on all lots at 2 mg/mL; the article notes these can be misread as false positives."
-  ]
+  ],
+  "submitter_rule": "Each published lot carries the article citation as its 'submitter' (decided 2026-11-13); results can be merged with 2026 form data for the same lot later.",
+  "target_note": "The 2026 dashboard tests racemic medetomidine HCl; the article also tested pure dexmedetomidine and levomedetomidine (see chiral_response)."
  },
  "lots": [
   {
@@ -20,7 +22,8 @@
    "strip_type": "Medetomidine",
    "expiration": "2026-08-07",
    "stated_cutoff": "1000 ng/mL",
-   "chiral_response": "requires_both_enantiomers"
+   "chiral_response": "requires_both_enantiomers",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "DOAB24100900",
@@ -29,7 +32,8 @@
    "strip_type": "Medetomidine",
    "expiration": "2027-10-18",
    "stated_cutoff": "1000 ng/mL",
-   "chiral_response": "requires_both_enantiomers"
+   "chiral_response": "requires_both_enantiomers",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "MTM25050002",
@@ -38,7 +42,8 @@
    "strip_type": "Medetomidine",
    "expiration": "2028-05-27",
    "stated_cutoff": "not given",
-   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo"
+   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "MTM24120002",
@@ -47,7 +52,8 @@
    "strip_type": "Medetomidine",
    "expiration": "2026-12-17",
    "stated_cutoff": "not given",
-   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo"
+   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "DOAB24100902",
@@ -56,7 +62,8 @@
    "strip_type": "Dexmedetomidine",
    "expiration": "2027-10-18",
    "stated_cutoff": "1000 ng/mL",
-   "chiral_response": "dexmedetomidine_selective"
+   "chiral_response": "dexmedetomidine_selective",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "DOAB25060002",
@@ -65,7 +72,8 @@
    "strip_type": "Dexmedetomidine",
    "expiration": "2028-06-11",
    "stated_cutoff": "1000 ng/mL",
-   "chiral_response": "dexmedetomidine_selective"
+   "chiral_response": "dexmedetomidine_selective",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   },
   {
    "lot": "DOAB25040024",
@@ -74,7 +82,8 @@
    "strip_type": "Dexmedetomidine",
    "expiration": "2028-04-24",
    "stated_cutoff": "1000 ng/mL",
-   "chiral_response": "dexmedetomidine_selective"
+   "chiral_response": "dexmedetomidine_selective",
+   "submitter": "Amate A, Lieberman M. Harm Reduct J (2025), doi 10.1186/s12954-025-01387-6"
   }
  ],
  "interference_2mg_per_ml": [
