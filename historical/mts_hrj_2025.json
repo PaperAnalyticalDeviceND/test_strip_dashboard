@@ -1,0 +1,356 @@
+{
+ "_source": {
+  "citation": "Amate A, Lieberman M. Chiral sensitivity of medetomidine lateral flow immunoassay test strips. Harm Reduct J (2025). https://doi.org/10.1186/s12954-025-01387-6 (open access, CC BY 4.0; published online 2 January 2026)",
+  "transcribed_from": "Table 1 (lots), Table 2 (interference at 2 mg/mL), Table 3 and text (detomidine), Figure 4 and text (enantiomer response) of the article-in-press PDF",
+  "transcribed_on": "2026-11-13",
+  "protocol": "Strips dipped 15 s in the test solution, read after 5 min against a 1-10 visual intensity scorecard (lateralDX #12082021); all solutions in 18 MOhm water (comparable to DI); interference: about 20 mg of each substance in 10 mL water (2 mg/mL), one strip per lot per substance. Per the manufacturers' directions any visible test line, however faint, counts as a negative result.",
+  "scoring": "'Neg-N' = negative with a test line of intensity N on the scorecard; Neg-1 to Neg-3 is a faint line that might be misread as a false positive; 'Pos' = positive (no test line, intensity 0).",
+  "not_included": "Limit-of-detection curves (Figures 2 and 3), tap water and temperature results, and the dex:levo mixture grid values beyond the per-lot class below are plotted but not tabulated in the article; the supplementary information (SI Tables S2 and 4) was not part of this file.",
+  "caveats": [
+   "Methods text lists WiseBatch lot 'MTM24100902'; Table 1, Table 2 and the figures all say MTM24120002. MTM24120002 is used here.",
+   "Detomidine caused false positives on all seven lots at 2 mg/mL; for BTNX lots DOAB24080502, DOAB24100900 and DOAB24100902 all strips were still positive at 0.07 mg/mL and interference ceased at 0.02 mg/mL (SI Table S2). The authors call this cross-reactivity 'a feature, not a bug'.",
+   "Levamisole gave faint test lines (Neg-2 to Neg-4) on all lots at 2 mg/mL; the article notes these can be misread as false positives."
+  ]
+ },
+ "lots": [
+  {
+   "lot": "DOAB24080502",
+   "brand": "BTNX (Rapid Response)",
+   "manufacturer": "BTNX Inc.",
+   "strip_type": "Medetomidine",
+   "expiration": "2026-08-07",
+   "stated_cutoff": "1000 ng/mL",
+   "chiral_response": "requires_both_enantiomers"
+  },
+  {
+   "lot": "DOAB24100900",
+   "brand": "BTNX (Rapid Response)",
+   "manufacturer": "BTNX Inc.",
+   "strip_type": "Medetomidine",
+   "expiration": "2027-10-18",
+   "stated_cutoff": "1000 ng/mL",
+   "chiral_response": "requires_both_enantiomers"
+  },
+  {
+   "lot": "MTM25050002",
+   "brand": "WiseBatch",
+   "manufacturer": "W.H.P.M.",
+   "strip_type": "Medetomidine",
+   "expiration": "2028-05-27",
+   "stated_cutoff": "not given",
+   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo"
+  },
+  {
+   "lot": "MTM24120002",
+   "brand": "WiseBatch",
+   "manufacturer": "W.H.P.M.",
+   "strip_type": "Medetomidine",
+   "expiration": "2026-12-17",
+   "stated_cutoff": "not given",
+   "chiral_response": "responds_to_dexmedetomidine_negative_to_pure_levo"
+  },
+  {
+   "lot": "DOAB24100902",
+   "brand": "BTNX (Rapid Response)",
+   "manufacturer": "BTNX Inc.",
+   "strip_type": "Dexmedetomidine",
+   "expiration": "2027-10-18",
+   "stated_cutoff": "1000 ng/mL",
+   "chiral_response": "dexmedetomidine_selective"
+  },
+  {
+   "lot": "DOAB25060002",
+   "brand": "BTNX (Rapid Response)",
+   "manufacturer": "BTNX Inc.",
+   "strip_type": "Dexmedetomidine",
+   "expiration": "2028-06-11",
+   "stated_cutoff": "1000 ng/mL",
+   "chiral_response": "dexmedetomidine_selective"
+  },
+  {
+   "lot": "DOAB25040024",
+   "brand": "BTNX (Rapid Response)",
+   "manufacturer": "BTNX Inc.",
+   "strip_type": "Dexmedetomidine",
+   "expiration": "2028-04-24",
+   "stated_cutoff": "1000 ng/mL",
+   "chiral_response": "dexmedetomidine_selective"
+  }
+ ],
+ "interference_2mg_per_ml": [
+  {
+   "substance": "Water",
+   "results": {
+    "DOAB24080502": "Neg-9",
+    "DOAB24100900": "Neg-9",
+    "MTM25050002": "Neg-9",
+    "MTM24120002": "Neg-9",
+    "DOAB24100902": "Neg-9",
+    "DOAB25060002": "Neg-9",
+    "DOAB25040024": "Neg-9"
+   }
+  },
+  {
+   "substance": "Fentanyl citrate",
+   "results": {
+    "DOAB24080502": "Neg-8",
+    "DOAB24100900": "Neg-8",
+    "MTM25050002": "Neg-9",
+    "MTM24120002": "Neg-8",
+    "DOAB24100902": "Neg-8",
+    "DOAB25060002": "Neg-8",
+    "DOAB25040024": "Neg-8"
+   }
+  },
+  {
+   "substance": "Xylazine",
+   "results": {
+    "DOAB24080502": "Neg-4",
+    "DOAB24100900": "Neg-4",
+    "MTM25050002": "Neg-5",
+    "MTM24120002": "Neg-4",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-4",
+    "DOAB25040024": "Neg-4"
+   }
+  },
+  {
+   "substance": "Ketamine",
+   "results": {
+    "DOAB24080502": "Neg-7",
+    "DOAB24100900": "Neg-7",
+    "MTM25050002": "Neg-4",
+    "MTM24120002": "Neg-7",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-7",
+    "DOAB25040024": "Neg-6"
+   }
+  },
+  {
+   "substance": "Levamisole",
+   "results": {
+    "DOAB24080502": "Neg-2",
+    "DOAB24100900": "Neg-2",
+    "MTM25050002": "Neg-4",
+    "MTM24120002": "Neg-2",
+    "DOAB24100902": "Neg-3",
+    "DOAB25060002": "Neg-2",
+    "DOAB25040024": "Neg-2"
+   }
+  },
+  {
+   "substance": "Dextromethorphan",
+   "results": {
+    "DOAB24080502": "Neg-8",
+    "DOAB24100900": "Neg-8",
+    "MTM25050002": "Neg-7",
+    "MTM24120002": "Neg-8",
+    "DOAB24100902": "Neg-8",
+    "DOAB25060002": "Neg-8",
+    "DOAB25040024": "Neg-8"
+   }
+  },
+  {
+   "substance": "Promethazine HCl",
+   "results": {
+    "DOAB24080502": "Neg-7",
+    "DOAB24100900": "Neg-7",
+    "MTM25050002": "Neg-8",
+    "MTM24120002": "Neg-7",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-7",
+    "DOAB25040024": "Neg-7"
+   }
+  },
+  {
+   "substance": "Clonidine",
+   "results": {
+    "DOAB24080502": "Neg-4",
+    "DOAB24100900": "Neg-5",
+    "MTM25050002": "Neg-7",
+    "MTM24120002": "Neg-5",
+    "DOAB24100902": "Neg-6",
+    "DOAB25060002": "Neg-5",
+    "DOAB25040024": "Neg-6"
+   }
+  },
+  {
+   "substance": "Cetirizine",
+   "results": {
+    "DOAB24080502": "Neg-6",
+    "DOAB24100900": "Neg-5",
+    "MTM25050002": "Neg-5",
+    "MTM24120002": "Neg-5",
+    "DOAB24100902": "Neg-6",
+    "DOAB25060002": "Neg-5",
+    "DOAB25040024": "Neg-5"
+   }
+  },
+  {
+   "substance": "Detomidine",
+   "results": {
+    "DOAB24080502": "Pos",
+    "DOAB24100900": "Pos",
+    "MTM25050002": "Pos",
+    "MTM24120002": "Pos",
+    "DOAB24100902": "Pos",
+    "DOAB25060002": "Pos",
+    "DOAB25040024": "Pos"
+   }
+  },
+  {
+   "substance": "Diphenhydramine",
+   "results": {
+    "DOAB24080502": "Neg-5",
+    "DOAB24100900": "Neg-5",
+    "MTM25050002": "Neg-4",
+    "MTM24120002": "Neg-6",
+    "DOAB24100902": "Neg-6",
+    "DOAB25060002": "Neg-6",
+    "DOAB25040024": "Neg-6"
+   }
+  },
+  {
+   "substance": "Heroin",
+   "results": {
+    "DOAB24080502": "Neg-6",
+    "DOAB24100900": "Neg-6",
+    "MTM25050002": "Neg-7",
+    "MTM24120002": "Neg-7",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-7",
+    "DOAB25040024": "Neg-7"
+   }
+  },
+  {
+   "substance": "Tar heroin",
+   "results": {
+    "DOAB24080502": "Neg-6",
+    "DOAB24100900": "Neg-6",
+    "MTM25050002": "Neg-5",
+    "MTM24120002": "Neg-7",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-7",
+    "DOAB25040024": "Neg-7"
+   }
+  },
+  {
+   "substance": "Tizanidine HCl",
+   "results": {
+    "DOAB24080502": "Neg-5",
+    "DOAB24100900": "Neg-6",
+    "MTM25050002": "Neg-8",
+    "MTM24120002": "Neg-6",
+    "DOAB24100902": "Neg-6",
+    "DOAB25060002": "Neg-6",
+    "DOAB25040024": "Neg-6"
+   }
+  },
+  {
+   "substance": "Romifidine HCl",
+   "results": {
+    "DOAB24080502": "Neg-4",
+    "DOAB24100900": "Neg-6",
+    "MTM25050002": "Neg-7",
+    "MTM24120002": "Neg-5",
+    "DOAB24100902": "Neg-7",
+    "DOAB25060002": "Neg-6",
+    "DOAB25040024": "Neg-7"
+   }
+  },
+  {
+   "substance": "Lidocaine",
+   "results": {
+    "DOAB24080502": "Neg-8",
+    "DOAB24100900": "Neg-8",
+    "MTM25050002": "Neg-7",
+    "MTM24120002": "Neg-8",
+    "DOAB24100902": "Neg-8",
+    "DOAB25060002": "Neg-8",
+    "DOAB25040024": "Neg-8"
+   }
+  }
+ ],
+ "chiral_response_key": {
+  "requires_both_enantiomers": "Reads positive only when both dexmedetomidine and levomedetomidine are present; negative with 5000 ng/mL of either pure enantiomer, although the racemic LOD was below 2000 ng/mL (early BTNX lots).",
+  "dexmedetomidine_selective": "Antibody selective for dexmedetomidine: positive whenever dexmedetomidine is above its LOD; racemic medetomidine is detected at about double that LOD (only the dex half acts). Labeled 'dexmedetomidine' strips (redesigned BTNX lots).",
+  "responds_to_dexmedetomidine_negative_to_pure_levo": "WiseBatch strips: positive for pure dexmedetomidine and for mixtures containing enough dexmedetomidine, negative for pure levomedetomidine. Per Figure 4, MTM25050002 stays positive down to 1000 ng/mL dex (with 5000 ng/mL levo) and MTM24120002 down to 3000 ng/mL dex."
+ },
+ "enantiomer_grid_figure4": {
+  "note": "Read from the dot grid in Figure 4 (filled = positive). Columns are dexmedetomidine:levomedetomidine in ug/mL; every other mixture in the grid read negative. Transcribed by eye from a figure, so check against the SI before quoting.",
+  "mixtures": [
+   "5:0",
+   "5:0.5",
+   "5:0.7",
+   "5:1",
+   "5:3",
+   "5:5",
+   "3:5",
+   "1:5",
+   "0.7:5",
+   "0.5:5",
+   "0:5"
+  ],
+  "positive_mixtures_by_lot": {
+   "DOAB24080502": [
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5"
+   ],
+   "DOAB24100900": [
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5",
+    "1:5"
+   ],
+   "MTM25050002": [
+    "5:0",
+    "5:0.5",
+    "5:0.7",
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5",
+    "1:5"
+   ],
+   "MTM24120002": [
+    "5:0",
+    "5:0.5",
+    "5:0.7",
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5"
+   ],
+   "DOAB24100902": [
+    "5:0",
+    "5:0.5",
+    "5:0.7",
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5"
+   ],
+   "DOAB25060002": [
+    "5:0",
+    "5:0.5",
+    "5:0.7",
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5"
+   ],
+   "DOAB25040024": [
+    "5:0",
+    "5:0.5",
+    "5:0.7",
+    "5:1",
+    "5:3",
+    "5:5",
+    "3:5"
+   ]
+  }
+ }
+}
