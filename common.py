@@ -28,7 +28,7 @@ NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 # version for both FTS and XTS -- they're the same "lot checking dashboard"
 # project, built from this same module, and versioned separately from the
 # unrelated sibling dashboard project's own counter.
-DASHBOARD_VERSION = '1.9'
+DASHBOARD_VERSION = '1.10'
 
 # Strips sold for carfentanil are not designed to detect fentanyl, so their
 # fentanyl results (e.g. 0/N at 200 ng/mL) are not a performance measure. The
