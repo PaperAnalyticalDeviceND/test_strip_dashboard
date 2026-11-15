@@ -86,6 +86,8 @@ def main():
     fts_data = extract_dashboard_data(fts_path)
     xts_data = extract_dashboard_data(xts_path)
     fts, xts = fts_data['overall'], xts_data['overall']
+    # Carfentanil strips are not fentanyl strips (see common.is_carfentanil_strip): leave them out of the landing-page FTS figures.
+    fts_data = dict(fts_data, lots=[l for l in fts_data['lots'] if not l.get('not_fentanyl_target')])
     fts_brands = len({l['brand'] for l in fts_data['lots']})
     xts_brands = len({l['brand'] for l in xts_data['lots']})
     fts_top, fts_counts = _top_interferents(fts_data, 1)
@@ -100,7 +102,7 @@ def main():
 
     html = open(template_path, encoding='utf-8').read()
     replacements = {
-        '__FTS_LOTS__': str(fts['n_lots']),
+        '__FTS_LOTS__': str(fts.get('n_fentanyl_lots', fts['n_lots'])),
         '__FTS_SUBS__': str(fts['n_submissions']),
         '__FTS_RATE__': f"{fts['pooled_fen_rate']:.1f}",
         '__XTS_LOTS__': str(xts['n_lots']),

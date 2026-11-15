@@ -27,7 +27,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import (
-    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id, split_claude_notes,
+    parse_xlsx_sheet, excel_serial_to_dt, fix_numeric_id, split_claude_notes, is_carfentanil_strip,
     build_photos_by_lot, inject_into_template,
     reconcile_photo_counts, DASHBOARD_VERSION, HOSTED_PHOTO_SUBDIR,
 )
@@ -182,6 +182,7 @@ def build_dashboard_data(records):
 
         lot_out.append({
             'brand': L['brand'], 'lot': L['lot'],
+            'not_fentanyl_target': is_carfentanil_strip(L['brand'], L['lot']),
             'expirations': [d.strftime('%-m/%-d/%Y') for d in sorted(L['expiration_dates'])],
             'n_submissions': len(L['submissions']), 'testers': sorted(L['testers']),
             'first_submitted': min(dates).strftime('%Y-%m-%d'), 'last_submitted': max(dates).strftime('%Y-%m-%d'),
@@ -199,14 +200,18 @@ def build_dashboard_data(records):
     for i, s in enumerate(sub_rows):
         s['id'] = i
 
-    total_fen_run = sum(l['fen_run'] for l in lot_out)
-    total_fen_pos = sum(l['fen_pos'] for l in lot_out)
-    total_wat_run = sum(l['wat_run'] for l in lot_out)
-    total_wat_tn = sum(l['wat_true_neg'] for l in lot_out)
+    # Pooled rates describe fentanyl strips only: carfentanil strips are not
+    # designed to detect fentanyl (see common.is_carfentanil_strip).
+    fen_lots = [l for l in lot_out if not l['not_fentanyl_target']]
+    total_fen_run = sum(l['fen_run'] for l in fen_lots)
+    total_fen_pos = sum(l['fen_pos'] for l in fen_lots)
+    total_wat_run = sum(l['wat_run'] for l in fen_lots)
+    total_wat_tn = sum(l['wat_true_neg'] for l in fen_lots)
     dts = [r['dt'] for r in records]
 
     overall = {
         'n_lots': len(lot_out), 'n_submissions': len(records), 'n_testers': len(set(r['name'] for r in records)),
+        'n_fentanyl_lots': len(fen_lots), 'n_not_target_lots': len(lot_out) - len(fen_lots),
         'pooled_fen_rate': round(100 * total_fen_pos / total_fen_run, 1) if total_fen_run else None,
         'pooled_wat_rate': round(100 * total_wat_tn / total_wat_run, 1) if total_wat_run else None,
         'date_range': [min(dts).strftime('%b %-d, %Y'), max(dts).strftime('%b %-d, %Y')],

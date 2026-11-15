@@ -216,6 +216,9 @@
   .status-good{color:var(--good);} .fill-good{background:var(--good);}
   .status-warn{color:var(--warn);} .fill-warn{background:var(--warn);}
   .status-crit{color:var(--crit);} .fill-crit{background:var(--crit);}
+  .status-na{color:var(--ink-3);} .fill-na{background:var(--ink-3); opacity:.35;}
+  .not-target-banner{background:var(--accent-tint); border:1px solid var(--accent-tint-border); border-left:4px solid var(--accent); color:var(--ink); font-size:12.5px; font-weight:600; line-height:1.35; padding:6px 10px; border-radius:6px; margin:0 0 10px;}
+  .drawer-summary .not-target-banner{font-size:13.5px; margin-bottom:10px;}
 
   .chip-row{display:flex; flex-wrap:wrap; gap:6px; min-height:24px;}
   .chip{
@@ -509,7 +512,7 @@
   </section>
 
   <footer>
-    <strong>Method.</strong> All figures on this page are based on reports to the password-protected lot checking data collector form. If your lab wants to participate, contact <a href="mailto:mlieberm@nd.edu">Prof.&nbsp;Lieberman</a>. A lot is identified by Brand&nbsp;+&nbsp;Lot&nbsp;number; expiration dates are recorded but not used for matching, since testers occasionally mistype them. &ldquo;Fentanyl detection rate&rdquo; pools every individual strip run at 200&nbsp;ng/mL across all submissions for that lot; &ldquo;true negative&rdquo; pools every strip run in plain water. Interferents are flagged when any replicate at any tested concentration (2.0, 0.7, or 0.2&nbsp;mg/mL) read positive. Some recently-logged lots show &ldquo;&mdash;&rdquo; because no replicates have been run yet. Thumbnails and gallery photos use each submission's product/packaging upload (column M) and strip-photo upload (column AZ), merged into one gallery per lot; a hash of each photo's contents is used to skip duplicate uploads of the same image. This is a static prototype, so photos are a fixed snapshot and refresh is manual for now. Chemical structure thumbnails on the interference matrix page are skeletal formulas from Wikimedia Commons (public domain; click a structure to open its source Wikipedia article).
+    <strong>Method.</strong> All figures on this page are based on reports to the password-protected lot checking data collector form. If your lab wants to participate, contact <a href="mailto:mlieberm@nd.edu">Prof.&nbsp;Lieberman</a>. A lot is identified by Brand&nbsp;+&nbsp;Lot&nbsp;number; expiration dates are recorded but not used for matching, since testers occasionally mistype them. &ldquo;Fentanyl detection rate&rdquo; pools every individual strip run at 200&nbsp;ng/mL across all submissions for that lot; &ldquo;true negative&rdquo; pools every strip run in plain water. Interferents are flagged when any replicate at any tested concentration (2.0, 0.7, or 0.2&nbsp;mg/mL) read positive. Some recently-logged lots show &ldquo;&mdash;&rdquo; because no replicates have been run yet. Thumbnails and gallery photos use each submission's product/packaging upload (column M) and strip-photo upload (column AZ), merged into one gallery per lot; a hash of each photo's contents is used to skip duplicate uploads of the same image. This is a static prototype, so photos are a fixed snapshot and refresh is manual for now. Chemical structure thumbnails on the interference matrix page are skeletal formulas from Wikimedia Commons (public domain; click a structure to open its source Wikipedia article). Strips sold for carfentanil are listed, but they are not designed to detect fentanyl, so they are left out of the pooled rates and the performance ranking.
     <br><span id="versionNote"></span>
     <br><a class="datause-btn" href="data-use.html">Data use &amp; protection</a>
   </footer>
@@ -575,8 +578,14 @@ function totalStripsTested(l){
 // is restricted to lots meeting the same >=25-strip threshold as the
 // high-volume badge, on both sides (this lot and its peer pool), so a
 // thin lot never gets a comparative claim built on noisy numbers.
+// Carfentanil strips are not designed to detect fentanyl, so their fentanyl
+// results are not a performance measure: they get a banner, are left out of
+// the peer pool, and are never ranked (the build sets not_fentanyl_target).
+const NOT_TARGET_BANNER = 'Carfentanil strips are not designed to detect fentanyl';
+function isNotTarget(l){ return !!l.not_fentanyl_target; }
+function notTargetBannerHTML(){ return `<div class="not-target-banner" role="note">${NOT_TARGET_BANNER}</div>`; }
 function eligibleLotsForFit(){
-  return lots.filter(x => totalStripsTested(x) >= HIGH_VOLUME_THRESHOLD);
+  return lots.filter(x => !isNotTarget(x) && totalStripsTested(x) >= HIGH_VOLUME_THRESHOLD);
 }
 function substanceCommonality(eligible){
   const flagged = {}, tested = {};
@@ -620,6 +629,7 @@ function percentileRank(value, allValues){
 // peer pool doesn't have enough data for a meaningful comparison. Shared by
 // the drawer's comparative sentence and the "overall performance" sort.
 function lotFitForUseScore(l, eligible, commonality){
+  if (isNotTarget(l)) return null;
   if (totalStripsTested(l) < HIGH_VOLUME_THRESHOLD) return null;
   eligible = eligible || eligibleLotsForFit();
   if (eligible.length < 5) return null;
@@ -638,6 +648,7 @@ function lotFitForUseScore(l, eligible, commonality){
   return {compositePct, detectPct, resistPct};
 }
 function lotFitForUseSentence(l){
+  if (isNotTarget(l)) return 'Not ranked against fentanyl strips.';
   const score = lotFitForUseScore(l);
   if (!score) return `Not enough testing yet to compare this lot with others (needs ${HIGH_VOLUME_THRESHOLD}+ strips).`;
   const {compositePct, detectPct, resistPct} = score;
@@ -705,9 +716,9 @@ function renderStats(){
   document.getElementById('dateRange').textContent = o.date_range[0] + ' – ' + o.date_range[1];
   document.getElementById('submissionCountLine').textContent = 'computed live from ' + o.n_submissions + ' raw submissions';
   const items = [
-    {label:'Lots tracked', value:o.n_lots, foot:o.n_testers + ' testers'},
+    {label:'Lots tracked', value:o.n_lots, foot:o.n_testers + ' testers' + (o.n_not_target_lots ? ' &middot; ' + o.n_not_target_lots + ' carfentanil, not scored' : '')},
     {label:'Submissions logged', value:o.n_submissions, foot:'raw form entries'},
-    {label:'Pooled fentanyl detection', value:fmtPct(o.pooled_fen_rate), foot:'200 ng/mL, all lots', accent:true},
+    {label:'Pooled fentanyl detection', value:fmtPct(o.pooled_fen_rate), foot:'200 ng/mL, fentanyl strips only', accent:true},
     {label:'Pooled true negative', value:fmtPct(o.pooled_wat_rate), foot:'strips run in plain water', accent:true},
   ];
   document.getElementById('statRow').innerHTML = items.map(it => `
@@ -722,6 +733,12 @@ function renderStats(){
 function lotSearchText(l){ return (l.brand + ' ' + l.lot).toLowerCase(); }
 
 function sortLots(list, mode){
+  const sorted = sortLotsRaw(list, mode);
+  // Carfentanil strips are never ranked: in the performance-based sorts they come after every ranked lot.
+  if (!['fen_asc', 'fen_desc', 'performance'].includes(mode)) return sorted;
+  return sorted.filter(l => !isNotTarget(l)).concat(sorted.filter(isNotTarget));
+}
+function sortLotsRaw(list, mode){
   const arr = list.slice();
   if (mode === 'fen_asc') arr.sort((a,b)=>(a.fen_rate??999)-(b.fen_rate??999));
   else if (mode === 'fen_desc') arr.sort((a,b)=>(b.fen_rate??-1)-(a.fen_rate??-1));
@@ -765,6 +782,7 @@ function sortLots(list, mode){
 }
 
 function performanceTierChip(l){
+  if (isNotTarget(l)) return `<div class="chip-row"><span class="chip untested">Not ranked: carfentanil strip</span></div>`;
   const score = lotFitForUseScore(l);
   if (!score) return `<div class="chip-row"><span class="chip untested">Not enough strips tested for overall performance evaluation</span></div>`;
   if (score.compositePct >= 0.7) return `<div class="chip-row"><span class="chip clean">Better than most</span></div>`;
@@ -778,7 +796,7 @@ function expirationChip(l){
   return `<div class="chip-row"><span class="chip ${d >= new Date() ? 'clean' : ''}">${esc(label)}</span></div>`;
 }
 function lotCardHTML(l, sortMode){
-  const fs = fenStatus(l.fen_rate), ws = watStatus(l.wat_rate);
+  const fs = isNotTarget(l) ? 'na' : fenStatus(l.fen_rate), ws = watStatus(l.wat_rate);
   const totalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
   const chips = l.interferents.length
     ? l.interferents.map(i => `<span class="chip">${i.label} @ ${i.min_mg_ml} mg/mL</span>`).join('')
@@ -810,6 +828,7 @@ function lotCardHTML(l, sortMode){
           ${photoBadge}
         </div>
       </div>
+      ${isNotTarget(l) ? notTargetBannerHTML() : ''}
       <div class="metric-row">
         <div class="metric">
           <div class="mlabel">True positive<br>200 ng/mL fentanyl</div>
@@ -971,6 +990,7 @@ function expirationSentence(l){
 function lotSummary(l){
   const faintNotes = faintNoteCounts(l);
   const paras = [];
+  if (isNotTarget(l)) paras.push(notTargetBannerHTML());
   paras.push(`<p>${lotFitForUseSentence(l)}</p>`);
   const flaw = waterFalsePositiveSentence(l);
   if (flaw) paras.push(`<p class="sum-flag">${flaw}</p>`);
@@ -1003,6 +1023,7 @@ function waterFalsePositiveSentence(l){
 function detectionSentence(l, faintNotes, hasTesterSummary){
   if (!l.fen_run) return hasTesterSummary ? '' : 'No fentanyl detection tests recorded yet.';
   let s = `Fentanyl at 200 ng/mL was detected in ${fmtRatioPhrase(l.fen_pos, l.fen_run)}.`;
+  if (isNotTarget(l)) return s + ' This is shown for information only and does not count against this strip.';
   if (l.fen_unsure) s += ` ${l.fen_unsure} ${plural(l.fen_unsure, 'read was', 'reads were')} marked "not sure".`;
   if (l.fen_pos < l.fen_run) s += ` (Any visible test line, even a ${faintWord(1)}, counts as not detected.)`;
   return s + faintNoteClause(faintNotes);
@@ -1011,7 +1032,7 @@ function openDrawer(key){
   const l = lots.find(x => (x.brand+'||'+x.lot) === key);
   if (!l) return;
   const subs = submissions.filter(s => (s.brand+'||'+s.lot) === key);
-  const fs = fenStatus(l.fen_rate), ws = watStatus(l.wat_rate);
+  const fs = isNotTarget(l) ? 'na' : fenStatus(l.fen_rate), ws = watStatus(l.wat_rate);
   const drawerTotalInterferenceRuns = Object.values(l.matrix).reduce((a,m)=>a+m.run,0);
   const interferentsHTML = l.interferents.length
     ? `<div class="interferent-list">${l.interferents.map(i=>`<div class="irow"><span>${i.label}</span><span>false-positive at ≥ ${i.min_mg_ml} mg/mL &middot; ${i.hits}/${i.run} replicates</span></div>`).join('')}</div>`
@@ -1351,12 +1372,13 @@ function renderGlanceBand(verdict, tone, sub, chips){
    numbers; the verdict thresholds are deliberately coarse. */
 function renderGlance(){
   const o = DATA.overall;
-  const brands = new Set(DATA.lots.map(l => l.brand)).size;
+  const fentanylLots = DATA.lots.filter(l => !isNotTarget(l));
+  const brands = new Set(fentanylLots.map(l => l.brand)).size;
   const det = o.pooled_fen_rate, wat = o.pooled_wat_rate;
   if (det === null || wat === null) return;
   const ALIAS = {Diphenhydramine:'Diphenhydramine (Benadryl)'};
   const counts = {};
-  DATA.lots.forEach(l => l.interferents.forEach(i => counts[i.label] = (counts[i.label]||0) + 1));
+  fentanylLots.forEach(l => l.interferents.forEach(i => counts[i.label] = (counts[i.label]||0) + 1));
   const top = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
   let verdict, tone = 'warn';
   if (det >= 90 && wat >= 99) { verdict = 'Works well.'; tone = 'good'; }
@@ -1368,7 +1390,7 @@ function renderGlance(){
     glanceChip(det >= 90 ? 'good' : 'warn','target',`Finds real fentanyl about ${inTen(det/100)} in 10 times`)
   ];
   if (top) chips.push(glanceChip('warn','warn',`Watch out for ${ALIAS[top[0]] || top[0]} &mdash; it can trick some strips`,'matrix'));
-  renderGlanceBand(verdict, tone, `Here&rsquo;s what our lab found after testing ${o.n_lots} batches of fentanyl strips from ${brands} companies.`, chips);
+  renderGlanceBand(verdict, tone, `Here&rsquo;s what our lab found after testing ${fentanylLots.length} batches of fentanyl strips from ${brands} companies.`, chips);
 }
 document.getElementById('barLegend').innerHTML = `
   <span>Bar colors:</span>
