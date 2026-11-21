@@ -1,51 +1,57 @@
 {
-  "pulled_at": "2026-11-14T01:36:08Z",
+  "pulled_at": "2026-11-21T01:36:19Z",
   "period_start": "2026-08-01T00:00:00Z",
-  "period_end": "2026-11-14T01:36:03Z",
-  "total_pageviews": 589,
-  "total_events": 98,
+  "period_end": "2026-11-21T01:36:13Z",
+  "total_pageviews": 645,
+  "total_events": 107,
   "pages": [
     {
       "path": "/test_strip_dashboard",
       "title": "Lieberman Lab \u2014 Test Strip Lot Checking Program",
       "is_event": false,
-      "count": 206
+      "count": 219
     },
     {
       "path": "/test_strip_dashboard/fts.html",
       "title": "FTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 171
+      "count": 192
     },
     {
       "path": "/test_strip_dashboard/xts.html",
       "title": "XTS Lot Characteristics \u2014 Lieberman Lab",
       "is_event": false,
-      "count": 107
+      "count": 120
     },
     {
       "path": "fts-view-matrix",
       "title": "FTS view: matrix",
       "is_event": true,
-      "count": 38
+      "count": 39
     },
     {
       "path": "fts-view-log",
       "title": "FTS view: log",
       "is_event": true,
-      "count": 19
+      "count": 20
     },
     {
       "path": "xts-view-matrix",
       "title": "XTS view: matrix",
       "is_event": true,
-      "count": 15
+      "count": 18
     },
     {
       "path": "fts-view-lots",
       "title": "FTS view: lots",
       "is_event": true,
       "count": 12
+    },
+    {
+      "path": "xts-view-log",
+      "title": "XTS view: log",
+      "is_event": true,
+      "count": 10
     },
     {
       "path": "xts-view-lots",
@@ -57,12 +63,6 @@
       "path": "/test_strip_dashboard/methodology.html",
       "title": "Methodology & Limitations \u2014 Lieberman Lab Test Strip Lot Checking",
       "is_event": false,
-      "count": 6
-    },
-    {
-      "path": "xts-view-log",
-      "title": "XTS view: log",
-      "is_event": true,
       "count": 6
     },
     {
